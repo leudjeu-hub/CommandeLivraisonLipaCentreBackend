@@ -22,3 +22,7 @@ services:
         value: "false"
       - key: SEED_PRODUCTS
         value: "true"
+      # Browser origins allowed to call the API (/admin is same-origin): the public site on
+      # GitHub Pages, and the frontend's local build (port 4200, see its vite/playwright config).
+      - key: CORS_ORIGINS
+        value: "https://leudjeu-hub.github.io,http://127.0.0.1:4200,http://localhost:4200"
