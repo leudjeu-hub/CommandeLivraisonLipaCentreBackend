@@ -1,0 +1,31 @@
+from fastapi import APIRouter, status
+
+from app.core.deps import AuthServiceDep, CurrentUserDep, TokenDep
+from app.schemas.auth import Credentials, LoginRequest, TokenRead, UserRead
+
+router = APIRouter()
+
+
+@router.post("/register", response_model=TokenRead, status_code=status.HTTP_201_CREATED)
+async def register(data: Credentials, service: AuthServiceDep) -> TokenRead:
+    """Create a customer account (role ``user``) and log it in."""
+    user = await service.register(data.email, data.password)
+    token = await service.create_token(user)
+    return TokenRead(token=token, user=UserRead.model_validate(user))
+
+
+@router.post("/login", response_model=TokenRead)
+async def login(data: LoginRequest, service: AuthServiceDep) -> TokenRead:
+    user = await service.authenticate(data.email, data.password)
+    token = await service.create_token(user)
+    return TokenRead(token=token, user=UserRead.model_validate(user))
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(token: TokenDep, service: AuthServiceDep) -> None:
+    await service.revoke_token(token)
+
+
+@router.get("/me", response_model=UserRead)
+async def me(user: CurrentUserDep) -> UserRead:
+    return UserRead.model_validate(user)

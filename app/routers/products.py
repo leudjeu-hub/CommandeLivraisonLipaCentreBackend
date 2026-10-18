@@ -1,9 +1,12 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.deps import ProductServiceDep
+from app.core.deps import ProductServiceDep, require_admin
 from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
 
 router = APIRouter()
+
+# Reading the catalogue is public; creating, editing and deleting products is for administrators.
+ADMIN_ONLY = [Depends(require_admin)]
 
 
 @router.get("/", response_model=list[ProductRead])
@@ -19,12 +22,14 @@ async def get_product(product_id: int, service: ProductServiceDep) -> ProductRea
     return ProductRead.model_validate(product)
 
 
-@router.post("/", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", response_model=ProductRead, status_code=status.HTTP_201_CREATED, dependencies=ADMIN_ONLY
+)
 async def create_product(data: ProductCreate, service: ProductServiceDep) -> ProductRead:
     return ProductRead.model_validate(await service.create(data))
 
 
-@router.put("/{product_id}", response_model=ProductRead)
+@router.put("/{product_id}", response_model=ProductRead, dependencies=ADMIN_ONLY)
 async def update_product(
     product_id: int, data: ProductUpdate, service: ProductServiceDep
 ) -> ProductRead:
@@ -34,7 +39,7 @@ async def update_product(
     return ProductRead.model_validate(product)
 
 
-@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=ADMIN_ONLY)
 async def delete_product(product_id: int, service: ProductServiceDep) -> None:
     if not await service.delete(product_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")

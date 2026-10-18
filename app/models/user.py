@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+import enum
+from datetime import datetime
+
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.db import Base
+
+
+class UserRole(enum.StrEnum):
+    USER = "user"
+    ADMIN = "admin"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Stored lowercased (see AuthService) so the unique index is case-insensitive in practice.
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        Enum(
+            UserRole,
+            native_enum=False,
+            length=20,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=False,
+        default=UserRole.USER,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
+
+
+class AuthToken(Base):
+    """A login session. Only the SHA-256 of the bearer token is stored."""
+
+    __tablename__ = "auth_tokens"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    user: Mapped[User] = relationship(lazy="selectin")

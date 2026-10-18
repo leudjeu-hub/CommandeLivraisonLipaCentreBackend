@@ -52,6 +52,7 @@
   .hidden-row td:not(.actions) { opacity: .55; }
   #message { margin: 0 0 12px; padding: 9px 12px; border-radius: 6px; display: none; }
   #message.error { display: block; background: var(--danger-bg); color: var(--danger); }
+  #login-error { color: var(--danger); min-height: 1.2em; }
   #message.ok { display: block; background: var(--ok-bg); }
   dialog {
     width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
@@ -79,6 +80,8 @@
 <header>
   <h1>Gestion des produits</h1>
   <button class="primary" id="new-btn" type="button">+ Nouveau produit</button>
+  <span class="muted" id="who"></span>
+  <button type="button" id="logout-btn" hidden>Se déconnecter</button>
 </header>
 <main>
   <p id="message" role="status"></p>
@@ -105,6 +108,21 @@
     </table>
   </div>
 </main>
+
+<dialog id="login-dialog">
+  <form id="login-form" novalidate>
+    <h2>Connexion administrateur</h2>
+    <p class="muted">Réservé aux comptes administrateur (créés avec <code>python -m app.scripts.create_admin</code>).</p>
+    <div class="grid">
+      <label class="full">E-mail<input name="email" type="email" required autocomplete="username"></label>
+      <label class="full">Mot de passe<input name="password" type="password" required autocomplete="current-password"></label>
+    </div>
+    <p id="login-error" class="error" role="alert"></p>
+    <div class="form-actions">
+      <button type="submit" class="primary">Se connecter</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="dialog">
   <form id="form" method="dialog" novalidate>
@@ -149,6 +167,9 @@ const form = $("#form");
 const message = $("#message");
 let products = [];
 let editingId = null;
+// Jeton de session de l'administrateur (onglet courant seulement)
+const TOKEN_KEY = "papeterie-admin-token";
+let token = sessionStorage.getItem(TOKEN_KEY);
 
 for (const select of [form.elements.category, $("#filter-category")]) {
   for (const category of CATEGORIES) select.add(new Option(category, category));
@@ -161,7 +182,13 @@ function showMessage(text, kind) {
 }
 
 async function request(url, options = {}) {
-  const response = await fetch(url, { headers: { "Content-Type": "application/json" }, ...options });
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await fetch(url, { headers, ...options });
+  if (response.status === 401 || response.status === 403) {
+    showLogin(response.status === 403 ? "Ce compte n'est pas administrateur." : "");
+    throw new Error("connexion administrateur requise");
+  }
   if (response.status === 204) return null;
   const body = await response.json().catch(() => null);
   if (!response.ok) {
@@ -320,11 +347,59 @@ $("#color-picker").addEventListener("input", (e) => { form.elements.color.value 
 form.elements.color.addEventListener("input", (e) => {
   if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) $("#color-picker").value = e.target.value;
 });
+function showLogin(error = "") {
+  token = null;
+  sessionStorage.removeItem(TOKEN_KEY);
+  $("#who").textContent = "";
+  $("#logout-btn").hidden = true;
+  $("#login-error").textContent = error;
+  if (!$("#login-dialog").open) $("#login-dialog").showModal();
+}
+
+async function checkSession() {
+  if (!token) return showLogin();
+  try {
+    const me = await request("/auth/me");
+    if (me.role !== "admin") return showLogin("Ce compte n'est pas administrateur.");
+    $("#who").textContent = me.email;
+    $("#logout-btn").hidden = false;
+    await load();
+  } catch (error) {
+    // 401/403 : showLogin a déjà été appelé ; sinon (API injoignable…) le dire
+    if (error.message !== "connexion administrateur requise") {
+      showMessage(`Impossible de vérifier la session : ${error.message}`, "error");
+    }
+  }
+}
+
+$("#login-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const f = event.target.elements;
+  try {
+    const body = await request("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email: f.email.value, password: f.password.value }),
+    });
+    token = body.token;
+    sessionStorage.setItem(TOKEN_KEY, token);
+    $("#login-dialog").close();
+    f.password.value = "";
+    await checkSession();
+  } catch (error) {
+    $("#login-error").textContent = error.message === "connexion administrateur requise"
+      ? "E-mail ou mot de passe incorrect." : error.message;
+  }
+});
+$("#login-dialog").addEventListener("cancel", (e) => e.preventDefault()); // pas de fermeture par Échap
+$("#logout-btn").addEventListener("click", async () => {
+  await request("/auth/logout", { method: "POST" }).catch(() => {});
+  showLogin();
+});
 $("#new-btn").addEventListener("click", () => openForm(null));
 $("#cancel-btn").addEventListener("click", () => dialog.close());
 $("#search").addEventListener("input", render);
 $("#filter-category").addEventListener("change", render);
-load();
+checkSession();
 </script>
 </body>
 </html>

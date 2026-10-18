@@ -12,7 +12,7 @@ from app import models  # noqa: F401  (registers tables on Base.metadata)
 from app.core.config import get_settings
 from app.core.db import Base, async_session_maker, engine
 from app.core.exceptions import AppError
-from app.routers import orders, products
+from app.routers import auth, orders, products, users
 from app.services.catalogue_seed import seed_products_if_empty
 
 settings = get_settings()
@@ -53,6 +53,8 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 
 app.include_router(products.router, prefix="/products", tags=["Products"])
 app.include_router(orders.router, prefix="/orders", tags=["Orders"])
+app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+app.include_router(users.router, prefix="/users", tags=["Users"])
 
 
 ADMIN_PAGE = Path(__file__).parent / "static" / "admin.html"

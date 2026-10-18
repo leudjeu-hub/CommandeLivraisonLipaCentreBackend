@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     create_tables: bool = False
     seed_products: bool = True
     cors_origins: str = "*"
+    # Lifetime of a login session (bearer token).
+    token_ttl_days: int = 30
 
     @property
     def async_database_url(self) -> str:

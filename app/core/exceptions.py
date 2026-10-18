@@ -36,3 +36,25 @@ class ProductInUseError(AppError):
         super().__init__(
             f"{product_name} appears in orders and cannot be deleted; mark it unavailable instead"
         )
+
+
+class EmailAlreadyUsedError(AppError):
+    status_code = 409
+    detail = "An account already exists for this e-mail"
+
+
+class InvalidCredentialsError(AppError):
+    status_code = 401
+    detail = "Invalid e-mail or password"
+
+
+class UserNotFoundError(AppError):
+    status_code = 404
+
+    def __init__(self, user_id: int) -> None:
+        super().__init__(f"User {user_id} not found")
+
+
+class LastAdminError(AppError):
+    status_code = 409
+    detail = "The last administrator cannot be demoted"

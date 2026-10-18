@@ -22,7 +22,8 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
 
 - `app/main.py` — app entrypoint. Lifespan optionally runs `create_all` when
   `CREATE_TABLES=true`; CORS from `CORS_ORIGINS`; registers the `AppError` handler; mounts
-  `/products` and `/orders`; serves `/` healthcheck and `/admin` (static `app/static/admin.html`, product CRUD UI, no auth).
+  `/products`, `/orders`, `/auth` and `/users`; serves `/` healthcheck and `/admin` (static
+  `app/static/admin.html`, product CRUD UI behind an administrator login).
 - `app/core/config.py` — pydantic-settings `Settings` (`get_settings()` is `lru_cache`d).
   `async_database_url` rewrites `postgres://` → `postgresql+asyncpg://`.
 - `app/core/db.py` — async engine, `async_session_maker` (`expire_on_commit=False`),
@@ -37,6 +38,18 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   and computes the total in one transaction; `to_order_read` attaches `whatsapp_url`.
 - `app/routers/` — thin HTTP layer; converts ORM models to `*Read` schemas.
 - `app/utils/whatsapp.py` — builds the `wa.me` deep link from `SHOP_WHATSAPP`.
+
+## Auth
+
+- `app/core/security.py` — scrypt password hashes and random bearer tokens (stdlib only); only
+  the token's SHA-256 is stored (`AuthToken`, `auth_tokens` table).
+- `app/services/auth_service.py` — register, authenticate (same timing for unknown e-mails), tokens,
+  roles (`UserRole`: `user`, `admin`; the last admin cannot be demoted).
+- `app/core/deps.py` — `CurrentUserDep` (401) and `require_admin` (403). Product writes, order reads
+  and status updates, and `/users` are admin-only; `GET /products` and `POST /orders` stay public.
+- First admin: `uv run python -m app.scripts.create_admin <email>`.
+- Tests: the `client` fixture is logged in as an admin; use `anon_client` for anonymous requests
+  and `make_user()` for other accounts.
 
 ## Gotchas
 
