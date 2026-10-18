@@ -7,9 +7,10 @@ from fastapi.responses import JSONResponse
 
 from app import models  # noqa: F401  (registers tables on Base.metadata)
 from app.core.config import get_settings
-from app.core.db import Base, engine
+from app.core.db import Base, async_session_maker, engine
 from app.core.exceptions import AppError
 from app.routers import orders, products
+from app.services.catalogue_seed import seed_products_if_empty
 
 settings = get_settings()
 
@@ -19,6 +20,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.create_tables:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+    if settings.seed_products:
+        async with async_session_maker() as session:
+            await seed_products_if_empty(session)
     yield
     await engine.dispose()
 

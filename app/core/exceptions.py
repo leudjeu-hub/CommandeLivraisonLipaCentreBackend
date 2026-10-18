@@ -20,3 +20,10 @@ class InsufficientStockError(AppError):
 
     def __init__(self, product_name: str) -> None:
         super().__init__(f"Not enough stock for {product_name}")
+
+
+class PriceOnRequestError(AppError):
+    status_code = 400
+
+    def __init__(self, product_name: str) -> None:
+        super().__init__(f"{product_name} is priced on request and cannot be ordered directly")

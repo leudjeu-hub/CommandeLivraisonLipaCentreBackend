@@ -2,7 +2,9 @@ from httpx import AsyncClient
 
 
 async def _create_product(client: AsyncClient, name: str, price: float, stock: int) -> int:
-    response = await client.post("/products/", json={"name": name, "price": price, "stock": stock})
+    response = await client.post(
+        "/products/", json={"category": "Scolaire", "name": name, "price": price, "stock": stock}
+    )
     return response.json()["id"]
 
 
@@ -105,3 +107,21 @@ async def test_list_orders(client: AsyncClient) -> None:
     response = await client.get("/orders/")
     assert response.status_code == 200
     assert len(response.json()) == 1
+
+
+async def test_order_price_on_request_product(client: AsyncClient) -> None:
+    book = (
+        await client.post(
+            "/products/", json={"category": "Livres", "name": "Livre sur demande", "stock": 5}
+        )
+    ).json()["id"]
+    response = await client.post(
+        "/orders/",
+        json={
+            "customer_name": "Jean",
+            "phone": "237600000000",
+            "items": [{"product_id": book, "quantity": 1}],
+        },
+    )
+    assert response.status_code == 400
+    assert "on request" in response.json()["detail"]

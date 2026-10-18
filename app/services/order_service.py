@@ -3,7 +3,11 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import InsufficientStockError, ProductNotFoundError
+from app.core.exceptions import (
+    InsufficientStockError,
+    PriceOnRequestError,
+    ProductNotFoundError,
+)
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.product import Product
@@ -22,6 +26,8 @@ class OrderService:
             product = await self.session.get(Product, item.product_id)
             if product is None:
                 raise ProductNotFoundError(item.product_id)
+            if product.price is None:
+                raise PriceOnRequestError(product.name)
             if product.stock < item.quantity:
                 raise InsufficientStockError(product.name)
             product.stock -= item.quantity
