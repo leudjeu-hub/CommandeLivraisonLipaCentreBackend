@@ -37,6 +37,12 @@ uv run uvicorn app.main:app --reload
 
 API docs: http://localhost:8000/docs
 
+Import the products from the frontend catalogue (upsert by `id`, stock is left untouched):
+
+```bash
+uv run python -m app.scripts.import_catalogue ../CommandeLivraisonLipaCentre/catalogue/catalogue.csv
+```
+
 For a quick start without migrations, set `CREATE_TABLES=true` and the app creates the
 tables on startup.
 
@@ -71,6 +77,7 @@ uv run mypy app
 | DATABASE_URL | postgresql+asyncpg://postgres:postgres@localhost:5432/papeterie | Async DB URL |
 | SHOP_WHATSAPP | 2376XXXXXXXX | WhatsApp number (no `+`) |
 | CREATE_TABLES | false | Create tables on startup instead of Alembic |
+| SEED_PRODUCTS | true | Fill an empty products table with the 8 catalogue products on startup |
 | CORS_ORIGINS | * | Comma-separated allowed origins |
 
 ## CI/CD

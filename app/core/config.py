@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/papeterie"
     shop_whatsapp: str = "2376XXXXXXXX"
     create_tables: bool = False
+    seed_products: bool = True
     cors_origins: str = "*"
 
     @property
