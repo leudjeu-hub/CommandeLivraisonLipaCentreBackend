@@ -62,11 +62,12 @@ uv run mypy app
 | Method | Path | Purpose |
 |---|---|---|
 | GET | / | Health check |
+| GET | /admin | Admin page: list, create, edit, delete products (no authentication) |
 | GET | /products/ | List products (sorted by name) |
 | GET | /products/{id} | Get one product |
 | POST | /products/ | Create product |
 | PUT | /products/{id} | Update product |
-| DELETE | /products/{id} | Delete product |
+| DELETE | /products/{id} | Delete product (409 if it appears in an order) |
 | POST | /orders/ | Create order (decrements stock, returns `whatsapp_url`) |
 | GET | /orders/ | List orders (newest first) |
 | GET | /orders/{id} | Get one order |

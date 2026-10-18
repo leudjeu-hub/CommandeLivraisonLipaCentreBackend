@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gestion des produits</title>
+<style>
+  :root {
+    --bg: #f6f4ef; --surface: #ffffff; --text: #1f2421; --muted: #6b716c;
+    --border: #dcd8cf; --accent: #31574b; --accent-text: #ffffff;
+    --danger: #a3392b; --danger-bg: #fbece9; --ok-bg: #e7f1ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161917; --surface: #1f2421; --text: #ecebe6; --muted: #a2a8a3;
+      --border: #353b37; --accent: #6fa893; --accent-text: #101312;
+      --danger: #e2806f; --danger-bg: #3a2420; --ok-bg: #20332b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header, main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+  h1 { font-size: 1.4rem; margin: 0; }
+  button {
+    font: inherit; cursor: pointer; border-radius: 6px; padding: 7px 14px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  button.danger { color: var(--danger); }
+  button:disabled { opacity: .5; cursor: default; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .toolbar input, .toolbar select { min-width: 0; }
+  input, select, textarea {
+    font: inherit; color: var(--text); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; width: 100%;
+  }
+  .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  tr:last-child td { border-bottom: 0; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.actions { white-space: nowrap; text-align: right; }
+  td.actions button { padding: 4px 10px; }
+  .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); vertical-align: -2px; margin-right: 6px; }
+  .muted { color: var(--muted); }
+  .tag { font-size: .8rem; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--border); white-space: nowrap; }
+  .hidden-row td:not(.actions) { opacity: .55; }
+  #message { margin: 0 0 12px; padding: 9px 12px; border-radius: 6px; display: none; }
+  #message.error { display: block; background: var(--danger-bg); color: var(--danger); }
+  #message.ok { display: block; background: var(--ok-bg); }
+  dialog {
+    width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
+    border: 1px solid var(--border); border-radius: 10px; padding: 0;
+    background: var(--surface); color: var(--text);
+  }
+  dialog::backdrop { background: rgb(0 0 0 / .4); }
+  form { padding: 18px; }
+  form h2 { margin: 0 0 14px; font-size: 1.15rem; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+  .grid .full { grid-column: 1 / -1; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: .88rem; color: var(--muted); }
+  label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); }
+  label.check input { width: auto; }
+  .color-row { display: flex; gap: 8px; }
+  .color-row input[type=color] { width: 48px; padding: 2px; flex: none; }
+  .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: 1fr; }
+    .col-optional { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Gestion des produits</h1>
+  <button class="primary" id="new-btn" type="button">+ Nouveau produit</button>
+</header>
+<main>
+  <p id="message" role="status"></p>
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="Rechercher un produit…" style="flex: 1 1 220px">
+    <select id="filter-category" style="flex: 0 1 180px">
+      <option value="">Toutes les catégories</option>
+    </select>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="num">#</th>
+          <th>Nom</th>
+          <th class="col-optional">Catégorie</th>
+          <th class="num">Prix (FCFA)</th>
+          <th class="num">Stock</th>
+          <th class="col-optional">État</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="rows"><tr><td colspan="7" class="muted">Chargement…</td></tr></tbody>
+    </table>
+  </div>
+</main>
+
+<dialog id="dialog">
+  <form id="form" method="dialog" novalidate>
+    <h2 id="form-title">Nouveau produit</h2>
+    <div class="grid">
+      <label class="full">Nom *<input name="name" required maxlength="255"></label>
+      <label>Catégorie *<select name="category" required></select></label>
+      <label>Prix (FCFA) <span class="muted">— vide = sur devis</span><input name="price" type="number" min="1" step="1"></label>
+      <label class="full">Description<textarea name="description" rows="2" maxlength="500"></textarea></label>
+      <label>Vignette <span class="muted">— 2 lignes séparées par « / »</span><input name="label" maxlength="255"></label>
+      <label>Stock<input name="stock" type="number" min="0" step="1" value="0"></label>
+      <label>Nom (anglais)<input name="name_en" maxlength="255"></label>
+      <label>Vignette (anglais)<input name="label_en" maxlength="255"></label>
+      <label class="full">Description (anglais)<textarea name="description_en" rows="2" maxlength="500"></textarea></label>
+      <label>Couleur <span class="muted">— vide = couleur de la catégorie</span>
+        <span class="color-row">
+          <input type="color" id="color-picker" value="#31574b" aria-label="Choisir la couleur">
+          <input name="color" placeholder="#RRGGBB" pattern="#[0-9a-fA-F]{6}" maxlength="7">
+        </span>
+      </label>
+      <label>Image <span class="muted">— ex. img/produits/cahier.webp</span><input name="image" maxlength="255"></label>
+      <label>Statut <span class="muted">— réservé</span><input name="status" maxlength="50"></label>
+      <label class="check"><input name="available" type="checkbox" checked> Disponible (visible sur le site)</label>
+    </div>
+    <div class="form-actions">
+      <button type="button" id="cancel-btn">Annuler</button>
+      <button type="submit" class="primary" id="save-btn">Enregistrer</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const API = "/products/";
+const CATEGORIES = ["Scolaire", "Bureau", "Livres"];
+const TEXT_FIELDS = ["name", "description", "label", "name_en", "description_en", "label_en", "color", "status", "image"];
+const OPTIONAL_FIELDS = new Set(["label", "name_en", "description_en", "label_en", "color", "status", "image"]);
+
+const $ = (sel) => document.querySelector(sel);
+const rows = $("#rows");
+const dialog = $("#dialog");
+const form = $("#form");
+const message = $("#message");
+let products = [];
+let editingId = null;
+
+for (const select of [form.elements.category, $("#filter-category")]) {
+  for (const category of CATEGORIES) select.add(new Option(category, category));
+}
+
+function showMessage(text, kind) {
+  message.textContent = text;
+  message.className = kind;
+  if (kind === "ok") setTimeout(() => { if (message.textContent === text) message.className = ""; }, 3000);
+}
+
+async function request(url, options = {}) {
+  const response = await fetch(url, { headers: { "Content-Type": "application/json" }, ...options });
+  if (response.status === 204) return null;
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    let detail = body && body.detail;
+    if (Array.isArray(detail)) detail = detail.map((d) => `${d.loc.at(-1)} : ${d.msg}`).join(" ; ");
+    throw new Error(detail || `Erreur ${response.status}`);
+  }
+  return body;
+}
+
+function cell(text, className) {
+  const td = document.createElement("td");
+  if (className) td.className = className;
+  td.textContent = text;
+  return td;
+}
+
+function render() {
+  const query = $("#search").value.trim().toLowerCase();
+  const category = $("#filter-category").value;
+  const visible = products
+    .filter((p) => !category || p.category === category)
+    .filter((p) => !query || `${p.name} ${p.name_en || ""} ${p.description}`.toLowerCase().includes(query))
+    .sort((a, b) => a.id - b.id);
+
+  rows.replaceChildren();
+  if (!visible.length) {
+    const tr = document.createElement("tr");
+    const td = cell(products.length ? "Aucun produit ne correspond." : "Aucun produit. Créez le premier !", "muted");
+    td.colSpan = 7;
+    tr.append(td);
+    rows.append(tr);
+    return;
+  }
+  for (const p of visible) {
+    const tr = document.createElement("tr");
+    if (!p.available) tr.className = "hidden-row";
+
+    const name = cell("");
+    const swatch = document.createElement("span");
+    swatch.className = "swatch";
+    swatch.style.background = p.color || "transparent";
+    name.append(swatch, document.createTextNode(p.name));
+    if (p.name_en) {
+      const en = document.createElement("div");
+      en.className = "muted";
+      en.textContent = p.name_en;
+      name.append(en);
+    }
+
+    const state = cell("", "col-optional");
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = p.available ? "Disponible" : "Masqué";
+    state.append(tag);
+
+    const actions = cell("", "actions");
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.textContent = "Modifier";
+    edit.addEventListener("click", () => openForm(p));
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "danger";
+    del.textContent = "Supprimer";
+    del.addEventListener("click", () => remove(p));
+    actions.append(edit, " ", del);
+
+    tr.append(
+      cell(p.id, "num"),
+      name,
+      cell(p.category, "col-optional"),
+      cell(p.price == null ? "sur devis" : p.price.toLocaleString("fr-FR"), "num"),
+      cell(p.stock, "num"),
+      state,
+      actions,
+    );
+    rows.append(tr);
+  }
+}
+
+async function load() {
+  try {
+    products = await request(API);
+    render();
+  } catch (error) {
+    rows.replaceChildren();
+    showMessage(`Impossible de charger les produits : ${error.message}`, "error");
+  }
+}
+
+function openForm(product) {
+  editingId = product ? product.id : null;
+  form.reset();
+  $("#form-title").textContent = product ? `Modifier « ${product.name} »` : "Nouveau produit";
+  if (product) {
+    for (const field of TEXT_FIELDS) form.elements[field].value = product[field] ?? "";
+    form.elements.category.value = product.category;
+    form.elements.price.value = product.price ?? "";
+    form.elements.stock.value = product.stock;
+    form.elements.available.checked = product.available;
+  }
+  $("#color-picker").value = form.elements.color.value || "#31574b";
+  dialog.showModal();
+  form.elements.name.focus();
+}
+
+function formData() {
+  const data = {};
+  for (const field of TEXT_FIELDS) {
+    const value = form.elements[field].value.trim();
+    data[field] = OPTIONAL_FIELDS.has(field) && !value ? null : value;
+  }
+  data.category = form.elements.category.value;
+  data.price = form.elements.price.value === "" ? null : Number(form.elements.price.value);
+  data.stock = Number(form.elements.stock.value || 0);
+  data.available = form.elements.available.checked;
+  return data;
+}
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!form.reportValidity()) return;
+  const save = $("#save-btn");
+  save.disabled = true;
+  try {
+    const data = formData();
+    if (editingId == null) {
+      const created = await request(API, { method: "POST", body: JSON.stringify(data) });
+      showMessage(`« ${created.name} » a été créé.`, "ok");
+    } else {
+      const updated = await request(`${API}${editingId}`, { method: "PUT", body: JSON.stringify(data) });
+      showMessage(`« ${updated.name} » a été modifié.`, "ok");
+    }
+    dialog.close();
+    await load();
+  } catch (error) {
+    alert(`Enregistrement impossible : ${error.message}`);
+  } finally {
+    save.disabled = false;
+  }
+});
+
+async function remove(product) {
+  if (!confirm(`Supprimer définitivement « ${product.name} » ?`)) return;
+  try {
+    await request(`${API}${product.id}`, { method: "DELETE" });
+    showMessage(`« ${product.name} » a été supprimé.`, "ok");
+    await load();
+  } catch (error) {
+    showMessage(`Suppression impossible : ${error.message}`, "error");
+  }
+}
+
+$("#color-picker").addEventListener("input", (e) => { form.elements.color.value = e.target.value; });
+form.elements.color.addEventListener("input", (e) => {
+  if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) $("#color-picker").value = e.target.value;
+});
+$("#new-btn").addEventListener("click", () => openForm(null));
+$("#cancel-btn").addEventListener("click", () => dialog.close());
+$("#search").addEventListener("input", render);
+$("#filter-category").addEventListener("change", render);
+load();
+</script>
+</body>
+</html>

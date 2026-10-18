@@ -113,3 +113,41 @@ async def test_seed_skips_non_empty_table(client: AsyncClient) -> None:
     async with async_session_maker() as session:
         assert await seed_products_if_empty(session) == 0
     assert len((await client.get("/products/")).json()) == 1
+
+
+async def test_update_product_to_price_on_request(client: AsyncClient) -> None:
+    created = (
+        await client.post("/products/", json={"category": "Livres", "name": "Livre", "price": 900})
+    ).json()
+    response = await client.put(
+        f"/products/{created['id']}", json={"price": None, "available": False}
+    )
+    assert response.status_code == 200
+    assert response.json()["price"] is None
+    assert response.json()["available"] is False
+
+
+async def test_delete_product_used_in_order(client: AsyncClient) -> None:
+    pen = (
+        await client.post(
+            "/products/", json={"category": "Scolaire", "name": "Stylo", "price": 500, "stock": 5}
+        )
+    ).json()["id"]
+    await client.post(
+        "/orders/",
+        json={
+            "customer_name": "Jean",
+            "phone": "237600000000",
+            "items": [{"product_id": pen, "quantity": 1}],
+        },
+    )
+    response = await client.delete(f"/products/{pen}")
+    assert response.status_code == 409
+    assert (await client.get(f"/products/{pen}")).status_code == 200
+
+
+async def test_admin_page(client: AsyncClient) -> None:
+    response = await client.get("/admin")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "Gestion des produits" in response.text

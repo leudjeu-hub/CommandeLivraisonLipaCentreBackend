@@ -1,8 +1,10 @@
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import ProductInUseError
+from app.models.order_item import OrderItem
 from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductUpdate
 
@@ -39,6 +41,8 @@ class ProductService:
         product = await self.get(product_id)
         if product is None:
             return False
+        if await self.session.scalar(select(exists().where(OrderItem.product_id == product_id))):
+            raise ProductInUseError(product.name)
         await self.session.delete(product)
         await self.session.commit()
         return True

@@ -1,10 +1,11 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import models  # noqa: F401  (registers tables on Base.metadata)
@@ -52,6 +53,14 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 
 app.include_router(products.router, prefix="/products", tags=["Products"])
 app.include_router(orders.router, prefix="/orders", tags=["Orders"])
+
+
+ADMIN_PAGE = Path(__file__).parent / "static" / "admin.html"
+
+
+@app.get("/admin", include_in_schema=False)
+async def admin() -> FileResponse:
+    return FileResponse(ADMIN_PAGE)
 
 
 @app.get("/", tags=["Status"])

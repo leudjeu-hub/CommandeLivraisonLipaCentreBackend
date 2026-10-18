@@ -27,3 +27,12 @@ class PriceOnRequestError(AppError):
 
     def __init__(self, product_name: str) -> None:
         super().__init__(f"{product_name} is priced on request and cannot be ordered directly")
+
+
+class ProductInUseError(AppError):
+    status_code = 409
+
+    def __init__(self, product_name: str) -> None:
+        super().__init__(
+            f"{product_name} appears in orders and cannot be deleted; mark it unavailable instead"
+        )

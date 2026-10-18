@@ -10,7 +10,7 @@ Run from the repo root (there is no workspace/codegen step).
 ```bash
 uv sync                                  # installs runtime + dev deps (dependency-groups)
 uv run uvicorn app.main:app --reload     # :8000, needs DATABASE_URL
-uv run pytest                            # 21 tests, SQLite, no external DB
+uv run pytest                            # 24 tests, SQLite, no external DB
 uv run ruff check . && uv run ruff format .
 uv run mypy app
 uv run alembic upgrade head              # apply migrations
@@ -22,7 +22,7 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
 
 - `app/main.py` — app entrypoint. Lifespan optionally runs `create_all` when
   `CREATE_TABLES=true`; CORS from `CORS_ORIGINS`; registers the `AppError` handler; mounts
-  `/products` and `/orders`; serves `/` healthcheck.
+  `/products` and `/orders`; serves `/` healthcheck and `/admin` (static `app/static/admin.html`, product CRUD UI, no auth).
 - `app/core/config.py` — pydantic-settings `Settings` (`get_settings()` is `lru_cache`d).
   `async_database_url` rewrites `postgres://` → `postgresql+asyncpg://`.
 - `app/core/db.py` — async engine, `async_session_maker` (`expire_on_commit=False`),
