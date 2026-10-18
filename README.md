@@ -28,6 +28,8 @@ tests/        pytest suite (SQLite)
 
 ## Getting started
 
+Works on **Windows** and **macOS**. All commands use `uv` — no platform-specific scripts.
+
 ```bash
 uv sync
 cp .env.example .env   # adjust DATABASE_URL / SHOP_WHATSAPP
