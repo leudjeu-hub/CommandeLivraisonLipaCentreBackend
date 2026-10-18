@@ -1,6 +1,7 @@
 from functools import lru_cache
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +20,9 @@ class Settings(BaseSettings):
     cors_origins: str = "*"
     # Lifetime of a login session (bearer token).
     token_ttl_days: int = 30
+    # First administrator, created on startup when both are set and no admin exists yet.
+    admin_email: str | None = None
+    admin_password: SecretStr | None = None
 
     @property
     def async_database_url(self) -> str:

@@ -13,6 +13,7 @@ from app.core.config import get_settings
 from app.core.db import Base, async_session_maker, engine
 from app.core.exceptions import AppError
 from app.routers import auth, orders, products, users
+from app.services.admin_bootstrap import ensure_admin
 from app.services.catalogue_seed import seed_products_if_empty
 
 settings = get_settings()
@@ -31,6 +32,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         except (OSError, SQLAlchemyError):
             # Keep serving (e.g. the healthcheck) when the database is unreachable at startup.
             logger.warning("Skipping product seeding: database unavailable", exc_info=True)
+    if settings.admin_email and settings.admin_password:
+        try:
+            async with async_session_maker() as session:
+                message = await ensure_admin(
+                    session, settings.admin_email, settings.admin_password.get_secret_value()
+                )
+            if message:
+                logger.warning(message)
+        except (OSError, SQLAlchemyError, ValueError):
+            logger.warning("Skipping admin bootstrap", exc_info=True)
     yield
     await engine.dispose()
 

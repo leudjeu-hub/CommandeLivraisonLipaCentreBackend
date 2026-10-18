@@ -92,6 +92,11 @@ For an existing account it only grants the admin role:
 uv run python -m app.scripts.create_admin admin@example.com
 ```
 
+On a server without shell access (Render), set `ADMIN_EMAIL` and `ADMIN_PASSWORD` instead: on
+startup the app creates that administrator if **no admin exists yet** (an existing account with
+that e-mail is promoted and keeps its password). Once any admin exists it does nothing, so
+`ADMIN_PASSWORD` can be removed afterwards.
+
 Further administrators can then be promoted by an admin (`PATCH /users/{id}/role`, or the site's
 `/gestion` page in development).
 
@@ -104,6 +109,7 @@ Further administrators can then be promoted by an admin (`PATCH /users/{id}/role
 | CREATE_TABLES | false | Create tables on startup instead of Alembic |
 | SEED_PRODUCTS | true | Fill an empty products table with the 8 catalogue products on startup |
 | CORS_ORIGINS | * | Comma-separated allowed origins |
+| ADMIN_EMAIL / ADMIN_PASSWORD | – | Create this first administrator on startup if no admin exists |
 | TOKEN_TTL_DAYS | 30 | Lifetime of a login session |
 
 ## Render

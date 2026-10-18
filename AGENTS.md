@@ -10,7 +10,7 @@ Run from the repo root (there is no workspace/codegen step).
 ```bash
 uv sync                                  # installs runtime + dev deps (dependency-groups)
 uv run uvicorn app.main:app --reload     # :8000, needs DATABASE_URL
-uv run pytest                            # 24 tests, SQLite, no external DB
+uv run pytest                            # 42 tests, SQLite, no external DB
 uv run ruff check . && uv run ruff format .
 uv run mypy app
 uv run alembic upgrade head              # apply migrations
@@ -47,7 +47,8 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   roles (`UserRole`: `user`, `admin`; the last admin cannot be demoted).
 - `app/core/deps.py` — `CurrentUserDep` (401) and `require_admin` (403). Product writes, order reads
   and status updates, and `/users` are admin-only; `GET /products` and `POST /orders` stay public.
-- First admin: `uv run python -m app.scripts.create_admin <email>`.
+- First admin: `uv run python -m app.scripts.create_admin <email>`, or `ADMIN_EMAIL` + `ADMIN_PASSWORD`
+  env vars (created on startup by `app/services/admin_bootstrap.py` only while no admin exists).
 - Tests: the `client` fixture is logged in as an admin; use `anon_client` for anonymous requests
   and `make_user()` for other accounts.
 
