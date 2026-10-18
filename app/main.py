@@ -1,25 +1,48 @@
-from fastapi import FastAPI
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from app.database import Base, engine
-from app import models  # noqa: F401  (registriert die Tabellen)
-from app.routers import produkte, bestellungen
+from app import models  # noqa: F401  (registers tables on Base.metadata)
+from app.core.config import get_settings
+from app.core.db import Base, engine
+from app.core.exceptions import AppError
+from app.routers import orders, products
 
-Base.metadata.create_all(engine)
+settings = get_settings()
 
-app = FastAPI(title="Papeterie API")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    if settings.create_tables:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    yield
+    await engine.dispose()
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
+
+allow_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allow_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(produkte.router, prefix="/produkte", tags=["Produkte"])
-app.include_router(bestellungen.router, prefix="/bestellungen", tags=["Bestellungen"])
+
+@app.exception_handler(AppError)
+async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+app.include_router(products.router, prefix="/products", tags=["Products"])
+app.include_router(orders.router, prefix="/orders", tags=["Orders"])
 
 
 @app.get("/", tags=["Status"])
-def status():
-    return {"status": "ok", "app": "Papeterie API"}
+async def status() -> dict[str, str]:
+    return {"status": "ok", "app": settings.app_name}

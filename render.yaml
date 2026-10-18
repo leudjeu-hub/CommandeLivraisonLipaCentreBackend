@@ -3,12 +3,15 @@ services:
     name: papeterie-api
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install uv && uv sync --frozen
+    startCommand: uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.9
+        value: "3.12"
       - key: DATABASE_URL
         sync: false
       - key: SHOP_WHATSAPP
         sync: false
+      - key: CREATE_TABLES
+        value: "true"

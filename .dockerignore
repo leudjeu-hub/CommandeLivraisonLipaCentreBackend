@@ -1,0 +1,17 @@
+.git
+.github
+.opencode
+__pycache__
+*.py[cod]
+.venv
+venv
+.env
+*.db
+.pytest_cache
+.mypy_cache
+.ruff_cache
+tests
+Dockerfile
+.dockerignore
+README.md
+AGENTS.md
