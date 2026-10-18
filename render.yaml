@@ -1,17 +1,24 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# DATABASE_URL (Neon) and SHOP_WHATSAPP come from the CommandeLivraisonLipaCentreGroup
+# environment group, which must exist in the Render dashboard.
 services:
   - type: web
     name: papeterie-api
     runtime: python
     plan: free
-    buildCommand: pip install uv && uv sync --frozen
-    startCommand: uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    branch: main
+    autoDeploy: true
+    buildCommand: pip install uv && uv sync --frozen --no-dev
+    # Migrations run on every start (idempotent); an empty products table is then seeded.
+    startCommand: >-
+      uv run --frozen --no-dev python -m app.scripts.migrate &&
+      uv run --frozen --no-dev uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /
     envVars:
+      - fromGroup: CommandeLivraisonLipaCentreGroup
       - key: PYTHON_VERSION
         value: "3.12"
-      - key: DATABASE_URL
-        sync: false
-      - key: SHOP_WHATSAPP
-        sync: false
       - key: CREATE_TABLES
+        value: "false"
+      - key: SEED_PRODUCTS
         value: "true"

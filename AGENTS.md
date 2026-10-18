@@ -10,7 +10,7 @@ Run from the repo root (there is no workspace/codegen step).
 ```bash
 uv sync                                  # installs runtime + dev deps (dependency-groups)
 uv run uvicorn app.main:app --reload     # :8000, needs DATABASE_URL
-uv run pytest                            # 18 tests, SQLite, no external DB
+uv run pytest                            # 21 tests, SQLite, no external DB
 uv run ruff check . && uv run ruff format .
 uv run mypy app
 uv run alembic upgrade head              # apply migrations

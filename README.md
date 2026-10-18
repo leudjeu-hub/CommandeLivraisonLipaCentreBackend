@@ -82,6 +82,14 @@ uv run mypy app
 | SEED_PRODUCTS | true | Fill an empty products table with the 8 catalogue products on startup |
 | CORS_ORIGINS | * | Comma-separated allowed origins |
 
+## Render
+
+`render.yaml` is a Render Blueprint. `DATABASE_URL` (Neon) and `SHOP_WHATSAPP` come from the
+`CommandeLivraisonLipaCentreGroup` environment group. On every start, `python -m app.scripts.migrate`
+applies the Alembic migrations (and stamps databases that were created by `create_all`), then the
+app fills an empty `products` table with the 8 catalogue products. Neon URLs with
+`?sslmode=require&channel_binding=require` work as-is.
+
 ## CI/CD
 
 - `.github/workflows/ci.yaml` — ruff check/format, mypy, pytest on every push/PR.
