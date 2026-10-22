@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Papeterie API"
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/papeterie"
+    database_url: str = "sqlite+aiosqlite:///./dev.db"
     shop_whatsapp: str = "2376XXXXXXXX"
     create_tables: bool = False
     seed_products: bool = True

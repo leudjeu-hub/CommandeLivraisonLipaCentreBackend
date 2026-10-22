@@ -5,6 +5,7 @@ description = "Order management API for Librairie Papeterie du Centre"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiosqlite>=0.20",
     "alembic>=1.14",
     "asyncpg>=0.30",
     "fastapi[standard]>=0.115",
@@ -16,7 +17,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "aiosqlite>=0.20",
     "httpx>=0.28",
     "mypy>=1.13",
     "pytest>=8.3",

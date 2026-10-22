@@ -9,7 +9,7 @@ Run from the repo root (there is no workspace/codegen step).
 
 ```bash
 uv sync                                  # installs runtime + dev deps (dependency-groups)
-uv run uvicorn app.main:app --reload     # :8000, needs DATABASE_URL
+uv run uvicorn app.main:app --reload     # :8000, DATABASE_URL defaults to local SQLite
 uv run pytest                            # 42 tests, SQLite, no external DB
 uv run ruff check . && uv run ruff format .
 uv run mypy app
@@ -64,8 +64,8 @@ production images (the Dockerfile does this).
 `CREATE_TABLES=true`. Otherwise use Alembic. Tests set `DATABASE_URL` to SQLite and create
 tables in a `conftest.py` fixture.
 
-**`DATABASE_URL` is required at import time** (engine is created eagerly). There is a default,
-but a real deployment must set it.
+**The engine is created eagerly at import time.** `DATABASE_URL` defaults to
+`sqlite+aiosqlite:///./dev.db` for local development; a real deployment must set a PostgreSQL URL.
 
 **`OrderStatus` uses `native_enum=False`**, so the column is `VARCHAR(20)` + CHECK — portable
 across PostgreSQL and SQLite. Keep the Alembic migration in sync if you change the enum.

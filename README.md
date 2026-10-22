@@ -140,7 +140,7 @@ Settings are read from environment variables or the repository-root `.env` file.
 
 | Variable | Default | Description |
 |---|---|---|
-| `DATABASE_URL` | Local PostgreSQL URL | Database connection URL. Use `sqlite+aiosqlite:///./dev.db` for local SQLite. |
+| `DATABASE_URL` | `sqlite+aiosqlite:///./dev.db` | Database connection URL. Local development defaults to SQLite; set a PostgreSQL URL in production. |
 | `SHOP_WHATSAPP` | `2376XXXXXXXX` | Shop WhatsApp number, without `+`, used to build order links |
 | `CREATE_TABLES` | `false` | Create tables at startup; intended for development, not production |
 | `SEED_PRODUCTS` | `true` | Seed the built-in products if the products table is empty |
