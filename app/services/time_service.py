@@ -5,9 +5,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AlreadyClockedInError, NotClockedInError, TimeEntryNotFoundError
+from app.core.exceptions import (
+    AlreadyClockedInError,
+    NotClockedInError,
+    OwnTimeEntryError,
+    TimeEntryNotFoundError,
+)
 from app.models.time_entry import TimeEntry
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.time_entry import TimeEntryRead, TimeEntryUpdate
 
 
@@ -72,10 +77,17 @@ class TimeService:
         result = await self.session.execute(query.order_by(TimeEntry.started_at, TimeEntry.id))
         return result.scalars().all()
 
-    async def correct(self, entry_id: int, data: TimeEntryUpdate, editor: User) -> TimeEntry:
+    async def _editable(self, entry_id: int, editor: User) -> TimeEntry:
         entry = await self.session.get(TimeEntry, entry_id)
         if entry is None:
             raise TimeEntryNotFoundError(entry_id)
+        # A manager cannot change their own hours; an administrator can.
+        if entry.user_id == editor.id and editor.role != UserRole.ADMIN:
+            raise OwnTimeEntryError()
+        return entry
+
+    async def correct(self, entry_id: int, data: TimeEntryUpdate, editor: User) -> TimeEntry:
+        entry = await self._editable(entry_id, editor)
         if data.ended_at is None and entry.ended_at is not None:
             other = await self.open_entry(entry.user_id)
             if other is not None and other.id != entry.id:
@@ -88,9 +100,7 @@ class TimeService:
         await self.session.refresh(entry)
         return entry
 
-    async def delete(self, entry_id: int) -> None:
-        entry = await self.session.get(TimeEntry, entry_id)
-        if entry is None:
-            raise TimeEntryNotFoundError(entry_id)
+    async def delete(self, entry_id: int, editor: User) -> None:
+        entry = await self._editable(entry_id, editor)
         await self.session.delete(entry)
         await self.session.commit()

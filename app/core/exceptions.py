@@ -57,7 +57,27 @@ class UserNotFoundError(AppError):
 
 class LastAdminError(AppError):
     status_code = 409
-    detail = "The last administrator cannot be demoted"
+    detail = "The last administrator cannot be demoted, blocked or deleted"
+
+
+class AccountBlockedError(AppError):
+    status_code = 403
+    detail = "This account is blocked"
+
+
+class OwnAccountError(AppError):
+    status_code = 409
+    detail = "You cannot block or delete your own account"
+
+
+class UserHasTimeEntriesError(AppError):
+    status_code = 409
+    detail = "This account has recorded hours and cannot be deleted; block it instead"
+
+
+class OwnTimeEntryError(AppError):
+    status_code = 403
+    detail = "Only an administrator can correct your own hours"
 
 
 class AlreadyClockedInError(AppError):

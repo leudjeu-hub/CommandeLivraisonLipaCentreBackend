@@ -148,3 +148,31 @@ async def test_admin_assigns_employee_role(client: AsyncClient) -> None:
     response = await client.patch(f"/users/{user_id}/role", json={"role": "employee"})
     assert response.status_code == 200
     assert response.json()["role"] == "employee"
+
+
+async def test_manager_sees_and_corrects_others_but_not_own(anon_client: AsyncClient) -> None:
+    emp = bearer(await make_user("emp@exemple.cm", "motdepasse", UserRole.EMPLOYEE))
+    boss = bearer(await make_user("resp@exemple.cm", "motdepasse", UserRole.MANAGER))
+    theirs = (await anon_client.post("/time/me/clock-in", headers=emp)).json()
+    own = (await anon_client.post("/time/me/clock-in", headers=boss)).json()
+
+    listed = await anon_client.get("/time/entries", params=period(), headers=boss)
+    assert {e["id"] for e in listed.json()} == {theirs["id"], own["id"]}
+    staff = await anon_client.get("/time/staff", headers=boss)
+    assert [u["email"] for u in staff.json()] == ["emp@exemple.cm", "resp@exemple.cm"]
+
+    fix = {"started_at": "2026-10-20T07:00:00Z", "ended_at": "2026-10-20T15:00:00Z"}
+    ok = await anon_client.put(f"/time/entries/{theirs['id']}", json=fix, headers=boss)
+    assert ok.status_code == 200
+    mine = await anon_client.put(f"/time/entries/{own['id']}", json=fix, headers=boss)
+    assert mine.status_code == 403
+    deleted = await anon_client.delete(f"/time/entries/{own['id']}", headers=boss)
+    assert deleted.status_code == 403
+
+
+async def test_manager_has_no_admin_rights(anon_client: AsyncClient) -> None:
+    boss = bearer(await make_user("resp@exemple.cm", "motdepasse", UserRole.MANAGER))
+    assert (await anon_client.get("/users/", headers=boss)).status_code == 403
+    assert (await anon_client.post("/products/", json={}, headers=boss)).status_code == 403
+    emp = bearer(await make_user("emp@exemple.cm", "motdepasse", UserRole.EMPLOYEE))
+    assert (await anon_client.get("/time/staff", headers=emp)).status_code == 403

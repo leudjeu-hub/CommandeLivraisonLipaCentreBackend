@@ -2,7 +2,8 @@ from datetime import datetime
 
 from fastapi import APIRouter, Query, status
 
-from app.core.deps import AdminDep, StaffDep, TimeServiceDep
+from app.core.deps import AuthServiceDep, ManagerDep, StaffDep, TimeServiceDep
+from app.schemas.auth import UserRead
 from app.schemas.time_entry import TimeEntryRead, TimeEntryUpdate, _to_naive_utc
 from app.services.time_service import to_time_entry_read
 
@@ -46,9 +47,15 @@ async def my_entries(
     return [to_time_entry_read(e) for e in entries]
 
 
+@router.get("/staff", response_model=list[UserRead])
+async def staff(_: ManagerDep, service: AuthServiceDep) -> list[UserRead]:
+    """Everyone who clocks in (employees, managers, administrators), for the hours table."""
+    return [UserRead.model_validate(u) for u in await service.list_staff()]
+
+
 @router.get("/entries", response_model=list[TimeEntryRead])
 async def all_entries(
-    _: AdminDep,
+    _: ManagerDep,
     service: TimeServiceDep,
     start: datetime = Start,
     end: datetime = End,
@@ -60,12 +67,12 @@ async def all_entries(
 
 @router.put("/entries/{entry_id}", response_model=TimeEntryRead)
 async def correct_entry(
-    entry_id: int, data: TimeEntryUpdate, admin: AdminDep, service: TimeServiceDep
+    entry_id: int, data: TimeEntryUpdate, editor: ManagerDep, service: TimeServiceDep
 ) -> TimeEntryRead:
     """Fix a forgotten or wrong punch. The correction is stamped with who made it and when."""
-    return to_time_entry_read(await service.correct(entry_id, data, admin))
+    return to_time_entry_read(await service.correct(entry_id, data, editor))
 
 
 @router.delete("/entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_entry(entry_id: int, _: AdminDep, service: TimeServiceDep) -> None:
-    await service.delete(entry_id)
+async def delete_entry(entry_id: int, editor: ManagerDep, service: TimeServiceDep) -> None:
+    await service.delete(entry_id, editor)

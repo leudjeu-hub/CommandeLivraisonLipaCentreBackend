@@ -5,7 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_async_session
-from app.models.user import User, UserRole
+from app.models.user import STAFF_ROLES, User, UserRole
 from app.services.auth_service import AuthService
 from app.services.order_service import OrderService
 from app.services.product_service import ProductService
@@ -76,11 +76,19 @@ async def require_admin(user: CurrentUserDep) -> User:
 
 
 async def require_staff(user: CurrentUserDep) -> User:
-    """Employees and administrators: the people who clock in and out."""
-    if user.role not in (UserRole.EMPLOYEE, UserRole.ADMIN):
+    """Employees, managers and administrators: the people who clock in and out."""
+    if user.role not in STAFF_ROLES:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Staff access required")
     return user
 
 
+async def require_manager(user: CurrentUserDep) -> User:
+    """Managers and administrators: the people who see and correct everyone's hours."""
+    if user.role not in (UserRole.MANAGER, UserRole.ADMIN):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Manager access required")
+    return user
+
+
 StaffDep = Annotated[User, Depends(require_staff)]
+ManagerDep = Annotated[User, Depends(require_manager)]
 AdminDep = Annotated[User, Depends(require_admin)]

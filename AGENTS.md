@@ -45,13 +45,17 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
 - `app/core/security.py` — scrypt password hashes and random bearer tokens (stdlib only); only
   the token's SHA-256 is stored (`AuthToken`, `auth_tokens` table).
 - `app/services/auth_service.py` — register, authenticate (same timing for unknown e-mails), tokens,
-  roles (`UserRole`: `user`, `employee`, `admin`; the last admin cannot be demoted).
+  roles (`UserRole`: `user`, `employee`, `manager`, `admin`; the last active admin cannot be demoted,
+  blocked or deleted). `User.is_active`: a blocked account gets 403 on login (after the password
+  check) and its tokens stop working. `/users/{id}/active` blocks or unblocks; `DELETE /users/{id}`
+  refuses an account with recorded hours (409) — block it instead. No one can block or delete themselves.
 - `app/core/deps.py` — `CurrentUserDep` (401) and `require_admin` (403). Product writes, order reads
   and status updates, and `/users` are admin-only; `GET /products` and `POST /orders` stay public.
 - Time clock (`/time`, `app/routers/time_entries.py`, `TimeService`): employees and admins
-  (`require_staff`) clock in/out at server time (`/time/me/clock-in`, `/clock-out`, `/current`,
-  `/entries`); admins list everyone's entries and correct (`PUT`, stamped `edited_at`/`edited_by_id`)
-  or delete them. Times are stored naive UTC and returned with a zone; a break is the gap between
+  (`require_staff`: employee, manager, admin) clock in/out at server time (`/time/me/clock-in`, `/clock-out`, `/current`,
+  `/entries`); managers and admins (`require_manager`) list everyone's entries (`/time/staff` for the
+  staff list) and correct (`PUT`, stamped `edited_at`/`edited_by_id`) or delete them; a manager cannot
+  change their own entries. Times are stored naive UTC and returned with a zone; a break is the gap between
   two entries. A partial unique index allows one open entry per person.
 - First admin: `uv run python -m app.scripts.create_admin <email>`, or `ADMIN_EMAIL` + `ADMIN_PASSWORD`
   env vars (created on startup by `app/services/admin_bootstrap.py` only while no admin exists).

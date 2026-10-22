@@ -7,9 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.exceptions import (
+    AccountBlockedError,
     EmailAlreadyUsedError,
     InvalidCredentialsError,
     LastAdminError,
+    OwnAccountError,
+    UserHasTimeEntriesError,
     UserNotFoundError,
 )
 from app.core.security import (
@@ -19,7 +22,8 @@ from app.core.security import (
     new_token,
     verify_password,
 )
-from app.models.user import AuthToken, User, UserRole
+from app.models.time_entry import TimeEntry
+from app.models.user import STAFF_ROLES, AuthToken, User, UserRole
 
 
 def normalize_email(email: str) -> str:
@@ -57,6 +61,9 @@ class AuthService:
             raise InvalidCredentialsError()
         if not verify_password(password, user.password_hash):
             raise InvalidCredentialsError()
+        # Checked after the password, so a wrong guess never learns that the account exists.
+        if not user.is_active:
+            raise AccountBlockedError()
         return user
 
     async def create_token(self, user: User) -> str:
@@ -73,7 +80,7 @@ class AuthService:
 
     async def user_for_token(self, token: str) -> User | None:
         auth = await self.session.get(AuthToken, hash_token(token))
-        if auth is None or auth.expires_at < datetime.now():
+        if auth is None or auth.expires_at < datetime.now() or not auth.user.is_active:
             return None
         return auth.user
 
@@ -87,17 +94,61 @@ class AuthService:
         result = await self.session.execute(select(User).order_by(User.created_at, User.id))
         return result.scalars().all()
 
-    async def set_role(self, user_id: int, role: UserRole) -> User:
+    async def list_staff(self) -> Sequence[User]:
+        result = await self.session.execute(
+            select(User).where(User.role.in_(STAFF_ROLES)).order_by(User.email)
+        )
+        return result.scalars().all()
+
+    async def _get(self, user_id: int) -> User:
         user = await self.session.get(User, user_id)
         if user is None:
             raise UserNotFoundError(user_id)
-        if user.role == UserRole.ADMIN and role != UserRole.ADMIN:
-            admins = await self.session.scalar(
-                select(func.count()).select_from(User).where(User.role == UserRole.ADMIN)
-            )
-            if (admins or 0) <= 1:
-                raise LastAdminError()
+        return user
+
+    async def _ensure_not_last_admin(self, user: User) -> None:
+        """Refuse a change that would leave no active administrator."""
+        if user.role != UserRole.ADMIN or not user.is_active:
+            return
+        admins = await self.session.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.role == UserRole.ADMIN, User.is_active.is_(True))
+        )
+        if (admins or 0) <= 1:
+            raise LastAdminError()
+
+    async def set_role(self, user_id: int, role: UserRole) -> User:
+        user = await self._get(user_id)
+        if role != UserRole.ADMIN:
+            await self._ensure_not_last_admin(user)
         user.role = role
         await self.session.commit()
         await self.session.refresh(user)
         return user
+
+    async def set_active(self, user_id: int, active: bool, actor: User) -> User:
+        user = await self._get(user_id)
+        if user.id == actor.id:
+            raise OwnAccountError()
+        if not active:
+            await self._ensure_not_last_admin(user)
+            await self.session.execute(delete(AuthToken).where(AuthToken.user_id == user.id))
+        user.is_active = active
+        await self.session.commit()
+        await self.session.refresh(user)
+        return user
+
+    async def delete_user(self, user_id: int, actor: User) -> None:
+        user = await self._get(user_id)
+        if user.id == actor.id:
+            raise OwnAccountError()
+        await self._ensure_not_last_admin(user)
+        # Deleting would erase the hours (cascade): keep the history, block the account instead.
+        has_hours = await self.session.scalar(
+            select(TimeEntry.id).where(TimeEntry.user_id == user.id).limit(1)
+        )
+        if has_hours is not None:
+            raise UserHasTimeEntriesError()
+        await self.session.delete(user)
+        await self.session.commit()
