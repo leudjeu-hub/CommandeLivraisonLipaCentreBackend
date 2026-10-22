@@ -6,12 +6,15 @@ from app.services.order_service import to_order_read
 
 router = APIRouter()
 
-# Anyone can place an order (no account needed); reading orders exposes customers' names and
-# phone numbers, so listing, reading and updating them is for administrators.
+# Administrators only. Orders hold customers' names and phone numbers, and creating one takes
+# stock: left public, anyone could empty the stock. The site does not use this endpoint
+# (customers send their order by WhatsApp).
 ADMIN_ONLY = [Depends(require_admin)]
 
 
-@router.post("/", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", response_model=OrderRead, status_code=status.HTTP_201_CREATED, dependencies=ADMIN_ONLY
+)
 async def create_order(data: OrderCreate, service: OrderServiceDep) -> OrderRead:
     order = await service.create(data)
     return to_order_read(order)

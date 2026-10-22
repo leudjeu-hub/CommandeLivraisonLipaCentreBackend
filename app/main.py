@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -61,6 +62,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# The full catalogue (~1,500 products) is ~470 KB of JSON but ~40 KB gzipped: it matters on 3G.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 @app.exception_handler(AppError)

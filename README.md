@@ -179,7 +179,7 @@ once the account exists. Further administrators can be promoted from `/admin` or
 | POST | `/products/` | Admin | Create a product |
 | PUT | `/products/{product_id}` | Admin | Update a product |
 | DELETE | `/products/{product_id}` | Admin | Delete a product |
-| POST | `/orders/` | Public | Place an order; the response includes a WhatsApp link |
+| POST | `/orders/` | Admin | Place an order; the response includes a WhatsApp link |
 | GET | `/orders/` | Admin | List orders |
 | GET | `/orders/{order_id}` | Admin | Get an order |
 | PATCH | `/orders/{order_id}/status` | Admin | Update an order status |
@@ -193,9 +193,11 @@ once the account exists. Further administrators can be promoted from `/admin` or
 Send the login token in the `Authorization: Bearer <token>` header. Missing or invalid tokens
 receive `401`; a signed-in customer attempting an admin-only operation receives `403`.
 
-Accounts have a `user` or `admin` role. The last administrator cannot be demoted. Order creation
-is public and does not require an account; listing and reading orders is admin-only because order
-records contain customer contact details. Order statuses are `new`, `confirmed`, `delivered`, and
+Accounts have a `user` or `admin` role. The last administrator cannot be demoted. Orders are
+admin-only: they contain customer contact details, and creating one takes stock (left public,
+anyone could empty it). The site does not use them; customers order by WhatsApp. After 10 wrong
+passwords for one e-mail within 15 minutes, `/auth/login` answers `429` for that e-mail. Responses
+over 1 KB are gzipped (the full catalogue drops from ~470 KB to ~40 KB). Order statuses are `new`, `confirmed`, `delivered`, and
 `cancelled`.
 
 Example order body:
