@@ -54,3 +54,29 @@ class ProductRead(BaseModel):
     status: str | None
     image: str | None
     stock: int
+
+
+class CatalogueImport(BaseModel):
+    """CSV text of a catalogue file; `dry_run` reports what would change without writing."""
+
+    content: str = Field(max_length=1_000_000)
+    dry_run: bool = True
+
+
+class CatalogueImportProblem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    line: int
+    code: str
+    column: str | None
+    value: str | None
+
+
+class CatalogueImportReport(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    applied: bool
+    created: int
+    updated: int
+    unchanged: int
+    errors: list[CatalogueImportProblem]
