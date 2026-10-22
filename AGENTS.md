@@ -10,7 +10,7 @@ Run from the repo root (there is no workspace/codegen step).
 ```bash
 uv sync                                  # installs runtime + dev deps (dependency-groups)
 uv run uvicorn app.main:app --reload     # :8000, DATABASE_URL defaults to local SQLite
-uv run pytest                            # 42 tests, SQLite, no external DB
+uv run pytest                            # SQLite, no external DB
 uv run ruff check . && uv run ruff format .
 uv run mypy app
 uv run alembic upgrade head              # apply migrations
@@ -45,9 +45,14 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
 - `app/core/security.py` — scrypt password hashes and random bearer tokens (stdlib only); only
   the token's SHA-256 is stored (`AuthToken`, `auth_tokens` table).
 - `app/services/auth_service.py` — register, authenticate (same timing for unknown e-mails), tokens,
-  roles (`UserRole`: `user`, `admin`; the last admin cannot be demoted).
+  roles (`UserRole`: `user`, `employee`, `admin`; the last admin cannot be demoted).
 - `app/core/deps.py` — `CurrentUserDep` (401) and `require_admin` (403). Product writes, order reads
   and status updates, and `/users` are admin-only; `GET /products` and `POST /orders` stay public.
+- Time clock (`/time`, `app/routers/time_entries.py`, `TimeService`): employees and admins
+  (`require_staff`) clock in/out at server time (`/time/me/clock-in`, `/clock-out`, `/current`,
+  `/entries`); admins list everyone's entries and correct (`PUT`, stamped `edited_at`/`edited_by_id`)
+  or delete them. Times are stored naive UTC and returned with a zone; a break is the gap between
+  two entries. A partial unique index allows one open entry per person.
 - First admin: `uv run python -m app.scripts.create_admin <email>`, or `ADMIN_EMAIL` + `ADMIN_PASSWORD`
   env vars (created on startup by `app/services/admin_bootstrap.py` only while no admin exists).
 - Tests: the `client` fixture is logged in as an admin; use `anon_client` for anonymous requests

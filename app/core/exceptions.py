@@ -58,3 +58,20 @@ class UserNotFoundError(AppError):
 class LastAdminError(AppError):
     status_code = 409
     detail = "The last administrator cannot be demoted"
+
+
+class AlreadyClockedInError(AppError):
+    status_code = 409
+    detail = "Already clocked in"
+
+
+class NotClockedInError(AppError):
+    status_code = 409
+    detail = "Not clocked in"
+
+
+class TimeEntryNotFoundError(AppError):
+    status_code = 404
+
+    def __init__(self, entry_id: int) -> None:
+        super().__init__(f"Time entry {entry_id} not found")

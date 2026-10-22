@@ -12,7 +12,7 @@ from app import models  # noqa: F401  (registers tables on Base.metadata)
 from app.core.config import get_settings
 from app.core.db import Base, async_session_maker, engine, initialize_database_if_empty
 from app.core.exceptions import AppError
-from app.routers import auth, orders, products, users
+from app.routers import auth, orders, products, time_entries, users
 from app.services.admin_bootstrap import ensure_admin
 from app.services.catalogue_seed import seed_products_if_empty
 
@@ -72,6 +72,7 @@ app.include_router(products.router, prefix="/products", tags=["Products"])
 app.include_router(orders.router, prefix="/orders", tags=["Orders"])
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(users.router, prefix="/users", tags=["Users"])
+app.include_router(time_entries.router, prefix="/time", tags=["Time clock"])
 
 
 ADMIN_PAGE = Path(__file__).parent / "static" / "admin.html"

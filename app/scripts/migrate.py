@@ -23,8 +23,10 @@ def detect_unversioned_revision(conn: Connection) -> str | None:
     tables = set(inspector.get_table_names())
     if "alembic_version" in tables or "products" not in tables:
         return None
-    if "users" in tables:
+    if "time_entries" in tables:
         return "head"
+    if "users" in tables:
+        return "0003"
     columns = {column["name"] for column in inspector.get_columns("products")}
     return "0002" if "category" in columns else "0001"
 
