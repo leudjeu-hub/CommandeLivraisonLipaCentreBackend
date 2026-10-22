@@ -23,6 +23,7 @@ class UserRead(BaseModel):
     email: str
     role: UserRole
     created_at: datetime
+    is_active: bool
 
 
 class TokenRead(BaseModel):
@@ -33,3 +34,7 @@ class TokenRead(BaseModel):
 
 class RoleUpdate(BaseModel):
     role: UserRole
+
+
+class ActiveUpdate(BaseModel):
+    active: bool

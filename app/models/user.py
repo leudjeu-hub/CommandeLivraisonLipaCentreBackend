@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -13,7 +13,13 @@ class UserRole(enum.StrEnum):
     USER = "user"
     # Staff who clock in and out (see TimeEntry); administrators can clock in too.
     EMPLOYEE = "employee"
+    # Supervises the time clock (sees and corrects employees' hours); no products or roles.
+    MANAGER = "manager"
     ADMIN = "admin"
+
+
+# Roles that clock in and out
+STAFF_ROLES = (UserRole.EMPLOYEE, UserRole.MANAGER, UserRole.ADMIN)
 
 
 class User(Base):
@@ -34,6 +40,10 @@ class User(Base):
         default=UserRole.USER,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
+    # A blocked account cannot log in and its sessions stop working.
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
 
 
 class AuthToken(Base):
