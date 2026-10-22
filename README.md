@@ -196,7 +196,8 @@ receive `401`; a signed-in customer attempting an admin-only operation receives 
 Accounts have a `user` or `admin` role. The last administrator cannot be demoted. Orders are
 admin-only: they contain customer contact details, and creating one takes stock (left public,
 anyone could empty it). The site does not use them; customers order by WhatsApp. After 10 wrong
-passwords for one e-mail within 15 minutes, `/auth/login` answers `429` for that e-mail. Responses
+passwords for one e-mail within 15 minutes, `/auth/login` answers `429` for that e-mail; after 30
+new accounts within an hour (site-wide), `/auth/register` answers `429`. Responses
 over 1 KB are gzipped (the full catalogue drops from ~470 KB to ~40 KB). Order statuses are `new`, `confirmed`, `delivered`, and
 `cancelled`.
 
