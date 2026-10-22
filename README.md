@@ -1,14 +1,16 @@
 # Papeterie API
 
-Async FastAPI backend for *Librairie Papeterie du Centre*. It provides a product catalogue,
-order management, and customer accounts with administrator roles.
+Async FastAPI backend for *Librairie Papeterie du Centre*. It provides a product catalogue with
+stock tracking, public order placement with a WhatsApp link, and customer accounts with
+administrator roles. A small admin dashboard is served at `/admin`.
 
 ## Stack
 
-- Python, FastAPI, and Uvicorn
+- Python 3.12+, FastAPI, and Uvicorn
 - SQLAlchemy 2 async with PostgreSQL (`asyncpg`) or SQLite (`aiosqlite`)
 - Pydantic v2 and pydantic-settings
-- Alembic database migrations
+- Alembic migrations
+- Scrypt password hashing and hashed bearer tokens (standard library only)
 - pytest, pytest-asyncio, and httpx
 - Ruff and mypy
 - uv for dependency and virtual-environment management
@@ -17,108 +19,167 @@ order management, and customer accounts with administrator roles.
 
 - Python 3.12 or newer
 - [uv](https://docs.astral.sh/uv/)
-- PostgreSQL for a shared or production database; SQLite is suitable for local development
+- PostgreSQL only for a shared or production database; SQLite is used for local development
+- Docker, only if you want to build the container image
 
-## Local development on Windows
+## Quick start
 
-Run these commands from the repository root in PowerShell:
+Run every command from the repository root. Imports are absolute (`from app...`), so the app must
+be started from this directory.
+
+### Windows (PowerShell)
 
 ```powershell
 uv sync
 Copy-Item .env.example .env
-```
-
-Open `.env` and configure the database. For a local SQLite database, use:
-
-```dotenv
-DATABASE_URL=sqlite+aiosqlite:///./dev.db
-CREATE_TABLES=true
-```
-
-`CREATE_TABLES=true` creates missing tables at application startup. Alternatively, leave it
-`false` and use Alembic migrations as described below. Do not enable `CREATE_TABLES` in
-production; apply migrations instead.
-
-Set `SHOP_WHATSAPP` to the shop's WhatsApp number without a leading `+`, then start the API:
-
-```powershell
 uv run uvicorn app.main:app --reload
 ```
 
-The API listens at <http://localhost:8000>. Interactive API documentation is at
-<http://localhost:8000/docs>.
+### macOS / Linux (bash or zsh)
 
-### Product catalogue seeding
-
-When `SEED_PRODUCTS=true` (the default), startup adds the eight built-in catalogue products only
-if the `products` table is empty. It does not overwrite or update existing products.
-
-If startup logs `Skipping product seeding: database unavailable`, the app could not query the
-database while attempting to seed. Check that `DATABASE_URL` points to the intended database,
-that the database is running and reachable, and that its schema has been created. With
-`CREATE_TABLES=false`, apply migrations before starting the app:
-
-```powershell
-uv run alembic upgrade head
+```bash
+uv sync
+cp .env.example .env
+uv run uvicorn app.main:app --reload
 ```
 
-The app logs the underlying database exception and continues starting, so the health endpoint
-may still respond even when database-backed routes are unavailable.
+The API listens at <http://localhost:8000>. Interactive documentation is at
+<http://localhost:8000/docs>, and the admin dashboard is at <http://localhost:8000/admin>.
 
-## Database migrations
+On the first start with an empty SQLite database, the app creates the schema and seeds the eight
+built-in catalogue products automatically. See [Database](#database) for the exact rules.
 
-For a new or existing database with `CREATE_TABLES=false`, apply the schema:
+## Configuration
 
-```powershell
+Settings are read from environment variables or the repository-root `.env` file. Environment
+variables take precedence over `.env`. Keep `.env` and production credentials out of version
+control.
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_URL` | `sqlite+aiosqlite:///./dev.db` | Database connection URL. Local development defaults to SQLite; set a PostgreSQL URL in production. |
+| `SHOP_WHATSAPP` | `2376XXXXXXXX` | Shop WhatsApp number, without `+`, used to build order links |
+| `CREATE_TABLES` | `false` | Create missing tables at startup via `metadata.create_all`; intended for development, not production |
+| `SEED_PRODUCTS` | `true` | Seed the eight built-in products if the products table is empty |
+| `CORS_ORIGINS` | `*` | Comma-separated list of allowed browser origins; `*` allows all |
+| `TOKEN_TTL_DAYS` | `30` | Lifetime of a login token |
+| `ADMIN_EMAIL` | Unset | Optional first administrator's email |
+| `ADMIN_PASSWORD` | Unset | Optional first administrator's password; remove after bootstrap |
+
+`SHOP_WHATSAPP` is not a secret but must be set for order responses to contain a usable
+`whatsapp_url`.
+
+## Database
+
+### Local SQLite
+
+SQLite is the default, so no database server is needed:
+
+```dotenv
+DATABASE_URL=sqlite+aiosqlite:///./dev.db
+```
+
+Startup behaviour for SQLite:
+
+1. If the database has no tables, the schema is created automatically.
+2. If `SEED_PRODUCTS=true` (the default) and the products table is empty, the catalogue is seeded.
+3. If `ADMIN_EMAIL` and `ADMIN_PASSWORD` are set and no administrator exists, that account is
+   created.
+
+`CREATE_TABLES=true` forces `metadata.create_all` on every start (it adds missing tables). Leave
+it `false` in production and use migrations. To reset local data, stop the API and delete
+`dev.db`; it is recreated and seeded on the next start.
+
+### PostgreSQL
+
+For a shared or production database, use the async driver URL:
+
+```dotenv
+DATABASE_URL=postgresql+asyncpg://user:password@host:5432/database
+```
+
+Plain `postgres://` and `postgresql://` URLs are rewritten to `postgresql+asyncpg://` at runtime.
+Neon/libpq `sslmode` is translated to asyncpg's `ssl` argument and `channel_binding` is dropped.
+
+### Migrations
+
+Apply the schema to a new or existing database:
+
+```bash
 uv run alembic upgrade head
 ```
 
 After changing SQLAlchemy models, generate and review a migration before applying it:
 
-```powershell
+```bash
 uv run alembic revision --autogenerate -m "describe the schema change"
 uv run alembic upgrade head
 ```
 
-For databases initially created using `CREATE_TABLES=true`, the deployment migration script
-stamps the existing schema before applying any newer migrations.
+For deployments, run the wrapper that stamps databases previously created with
+`CREATE_TABLES=true` before upgrading:
 
-## Importing the full catalogue
+```bash
+uv run python -m app.scripts.migrate
+```
 
-To import or update products from the companion frontend repository's catalogue CSV, run from
-this repository's root:
+Alembic reads `DATABASE_URL` through `app.core.config.get_settings()`, so the same `.env` or
+environment variables apply to migrations.
+
+## Product catalogue
+
+When `SEED_PRODUCTS=true` (the default), startup inserts the eight built-in products only if the
+`products` table is empty. Existing products are never overwritten.
+
+To import or update the full catalogue from the companion frontend repository's CSV (upsert by
+product ID; stock is left unchanged):
 
 ```powershell
+# Windows
 uv run python -m app.scripts.import_catalogue ..\CommandeLivraisonLipaCentre\catalogue\catalogue.csv
 ```
 
-The import upserts by product ID and leaves stock unchanged.
+```bash
+# macOS / Linux
+uv run python -m app.scripts.import_catalogue ../CommandeLivraisonLipaCentre/catalogue/catalogue.csv
+```
 
-## First administrator
+If startup logs `Skipping product seeding: database unavailable`, the app could not reach the
+database. Check `DATABASE_URL`, make sure the database is running, and apply migrations (or set
+`CREATE_TABLES=true` locally). The app logs the underlying exception and keeps starting, so the
+health endpoint may still respond while database-backed routes fail.
 
-Create an administrator interactively from a machine that can connect to the database:
+## Administrators
 
-```powershell
+Create an administrator interactively, or promote an existing account (the password is not
+changed when the account already exists):
+
+```bash
 uv run python -m app.scripts.create_admin admin@example.com
 ```
 
-For a deployment without shell access, set `ADMIN_EMAIL` and `ADMIN_PASSWORD`. At startup, the
-app creates that administrator only if no administrator exists; if an account with that email
-already exists, it promotes the account without changing its password. Remove
-`ADMIN_PASSWORD` after the administrator has been created.
+The script prompts for a password of at least 8 characters. Set `ADMIN_PASSWORD` to skip the
+prompt, for example on a server.
+
+For deployments without shell access, set `ADMIN_EMAIL` and `ADMIN_PASSWORD` and let startup create
+the first administrator. It only runs while no administrator exists; if the email belongs to an
+existing account, that account is promoted without a password change. Remove `ADMIN_PASSWORD`
+once the account exists. Further administrators can be promoted from `/admin` or with
+`PATCH /users/{user_id}/role`.
 
 ## API endpoints
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
 | GET | `/` | Public | Health check |
-| GET | `/admin` | Page | Serve the admin page |
+| GET | `/docs` | Public | Interactive API documentation |
+| GET | `/admin` | Public page | Admin dashboard (logs in through the API) |
 | GET | `/products/` | Public | List products |
 | GET | `/products/{product_id}` | Public | Get a product |
 | POST | `/products/` | Admin | Create a product |
 | PUT | `/products/{product_id}` | Admin | Update a product |
 | DELETE | `/products/{product_id}` | Admin | Delete a product |
-| POST | `/orders/` | Public | Place an order; response includes a WhatsApp link |
+| POST | `/orders/` | Public | Place an order; the response includes a WhatsApp link |
 | GET | `/orders/` | Admin | List orders |
 | GET | `/orders/{order_id}` | Admin | Get an order |
 | PATCH | `/orders/{order_id}/status` | Admin | Update an order status |
@@ -130,49 +191,79 @@ already exists, it promotes the account without changing its password. Remove
 | PATCH | `/users/{user_id}/role` | Admin | Promote or demote an account |
 
 Send the login token in the `Authorization: Bearer <token>` header. Missing or invalid tokens
-receive `401`; a signed-in customer attempting an admin-only operation receives `403`. Order
-creation is public and does not require an account. Order listing and retrieval are admin-only
-because order records contain customer contact details.
+receive `401`; a signed-in customer attempting an admin-only operation receives `403`.
 
-## Configuration
+Accounts have a `user` or `admin` role. The last administrator cannot be demoted. Order creation
+is public and does not require an account; listing and reading orders is admin-only because order
+records contain customer contact details. Order statuses are `new`, `confirmed`, `delivered`, and
+`cancelled`.
 
-Settings are read from environment variables or the repository-root `.env` file.
+Example order body:
 
-| Variable | Default | Description |
-|---|---|---|
-| `DATABASE_URL` | `sqlite+aiosqlite:///./dev.db` | Database connection URL. Local development defaults to SQLite; set a PostgreSQL URL in production. |
-| `SHOP_WHATSAPP` | `2376XXXXXXXX` | Shop WhatsApp number, without `+`, used to build order links |
-| `CREATE_TABLES` | `false` | Create tables at startup; intended for development, not production |
-| `SEED_PRODUCTS` | `true` | Seed the built-in products if the products table is empty |
-| `CORS_ORIGINS` | `*` | Comma-separated allowed origins |
-| `TOKEN_TTL_DAYS` | `30` | Lifetime of a login token |
-| `ADMIN_EMAIL` | Unset | Optional first administrator's email |
-| `ADMIN_PASSWORD` | Unset | Optional first administrator's password; remove after bootstrap |
+```json
+{
+  "customer_name": "Awa",
+  "phone": "2376XXXXXXXX",
+  "items": [
+    { "product_id": 1, "quantity": 2 },
+    { "product_id": 6, "quantity": 1 }
+  ]
+}
+```
 
-Keep `.env` and production credentials out of version control.
+Order creation decrements product stock and computes the total in the same transaction. If a
+product is missing or has insufficient stock, the order is rejected.
+
+## Project layout
+
+```text
+app/
+  main.py            FastAPI app, lifespan, CORS, error handler, admin page
+  core/              Settings, async engine/session, dependencies, errors, security
+  models/            SQLAlchemy models: Product, Order, OrderItem, User, AuthToken
+  schemas/           Pydantic v2 request/response models
+  services/          Product, order, and auth services; seeding and admin bootstrap
+  routers/           HTTP endpoints for products, orders, auth, and users
+  scripts/           create_admin, import_catalogue, migrate
+  static/admin.html  Admin dashboard
+  utils/whatsapp.py  WhatsApp deep-link builder
+alembic/             Migration environment and versions
+tests/               pytest suite (SQLite, no external database)
+```
 
 ## Tests, lint, and type checking
 
 Tests use SQLite and do not require an external database:
 
-```powershell
+```bash
 uv run pytest
+uv run pytest --cov=app --cov-report=term-missing
 uv run ruff check .
 uv run ruff format .
 uv run mypy app
 ```
 
+`uv sync` installs runtime and development dependencies by default. Use `uv sync --no-dev` for a
+production-only environment.
+
 ## Deployment
 
-`render.yaml` defines a Render Blueprint. The Render startup command runs
-`python -m app.scripts.migrate` to apply Alembic migrations, then the app seeds an empty product
-table. Configure `DATABASE_URL` and `SHOP_WHATSAPP` in the Render environment. PostgreSQL URLs
-with `sslmode` and `channel_binding` parameters are supported.
+### Render
 
-For GitHub Actions deployment to Render, configure `RENDER_SERVICE_ID` and `RENDER_API_KEY` as
-GitHub Actions secrets.
+`render.yaml` defines a Render Blueprint. The start command runs
+`python -m app.scripts.migrate` before Uvicorn, so migrations are applied on every start, and the
+app then seeds an empty products table. The blueprint expects a Render environment group named
+`CommandeLivraisonLipaCentreGroup` containing `DATABASE_URL` and `SHOP_WHATSAPP`.
 
-Build and run the Docker image with:
+For GitHub Actions deployment, configure `RENDER_SERVICE_ID` and `RENDER_API_KEY` as GitHub
+Actions secrets.
+
+### Docker
+
+The image installs production dependencies only and runs Uvicorn. It does not run migrations, so
+apply them before or at container start.
+
+Windows (PowerShell):
 
 ```powershell
 docker build -t papeterie-api .
@@ -180,5 +271,21 @@ $env:DATABASE_URL = "your-database-url"
 docker run -p 8000:8000 --env "DATABASE_URL=$env:DATABASE_URL" papeterie-api
 ```
 
-The CI workflow runs Ruff, mypy, and pytest. The CD workflow builds and publishes Docker images
-to GHCR and deploys to Render on its configured branches and tags.
+macOS / Linux:
+
+```bash
+docker build -t papeterie-api .
+export DATABASE_URL="your-database-url"
+docker run -p 8000:8000 -e DATABASE_URL="$DATABASE_URL" papeterie-api
+```
+
+Add `SHOP_WHATSAPP` the same way. For a SQLite container without migrations, set
+`CREATE_TABLES=true` and mount a volume if the database must survive container replacement.
+
+### CI/CD
+
+- CI (`.github/workflows/ci.yaml`) runs on pushes to `main` and pull requests: Ruff check and
+  format check, mypy, then pytest with coverage.
+- CD (`.github/workflows/cd.yaml`) runs on `v*` tags and manual dispatch: it builds and pushes an
+  image to `ghcr.io/<owner>/<repository>`, then deploys to Render for tags or manual runs on
+  `main` when the required secrets are set.

@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app import models  # noqa: F401  (registers tables on Base.metadata)
 from app.core.config import get_settings
-from app.core.db import Base, async_session_maker, engine
+from app.core.db import Base, async_session_maker, engine, initialize_database_if_empty
 from app.core.exceptions import AppError
 from app.routers import auth, orders, products, users
 from app.services.admin_bootstrap import ensure_admin
@@ -25,6 +25,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.create_tables:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+    elif engine.dialect.name == "sqlite":
+        try:
+            if await initialize_database_if_empty():
+                logger.info("Created schema in empty local SQLite database")
+        except (OSError, SQLAlchemyError):
+            logger.warning("Skipping database initialization", exc_info=True)
     if settings.seed_products:
         try:
             async with async_session_maker() as session:

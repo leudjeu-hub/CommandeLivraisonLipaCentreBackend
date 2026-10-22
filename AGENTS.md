@@ -20,8 +20,9 @@ uv run alembic upgrade head              # apply migrations
 
 Layered, one direction only: `routers/` → `services/` → `models/` + `schemas/`.
 
-- `app/main.py` — app entrypoint. Lifespan optionally runs `create_all` when
-  `CREATE_TABLES=true`; CORS from `CORS_ORIGINS`; registers the `AppError` handler; mounts
+- `app/main.py` — app entrypoint. Lifespan runs `create_all` when `CREATE_TABLES=true`
+  (and initializes an empty local SQLite database automatically); CORS from
+  `CORS_ORIGINS`; registers the `AppError` handler; mounts
   `/products`, `/orders`, `/auth` and `/users`; serves `/` healthcheck and `/admin` (static
   `app/static/admin.html`, product CRUD UI behind an administrator login).
 - `app/core/config.py` — pydantic-settings `Settings` (`get_settings()` is `lru_cache`d).
@@ -60,9 +61,10 @@ run uvicorn/pytest with cwd = repo root.
 **`uv sync` installs dev deps by default** (`[dependency-groups]`). Use `uv sync --no-dev` for
 production images (the Dockerfile does this).
 
-**No tables are created at import time.** `create_all` only runs in lifespan when
-`CREATE_TABLES=true`. Otherwise use Alembic. Tests set `DATABASE_URL` to SQLite and create
-tables in a `conftest.py` fixture.
+**No tables are created at import time.** In lifespan, `create_all` runs when
+`CREATE_TABLES=true`, and an empty SQLite database is initialized automatically
+(`initialize_database_if_empty`). Otherwise use Alembic. Tests set `DATABASE_URL` to SQLite and
+create tables in a `conftest.py` fixture.
 
 **The engine is created eagerly at import time.** `DATABASE_URL` defaults to
 `sqlite+aiosqlite:///./dev.db` for local development; a real deployment must set a PostgreSQL URL.
