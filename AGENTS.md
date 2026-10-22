@@ -57,6 +57,11 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   staff list) and correct (`PUT`, stamped `edited_at`/`edited_by_id`) or delete them; a manager cannot
   change their own entries. Times are stored naive UTC and returned with a zone; a break is the gap between
   two entries. A partial unique index allows one open entry per person.
+- Catalogue import (`POST /products/import`, admin only, `app/services/catalogue_import.py`): JSON
+  `{content, dry_run}` with the CSV text (French headers `id;categorie;prix;nom;…`, `;` or `,`).
+  A row with `id` updates that product (unknown id = error), without `id` it updates the product of
+  the same name (case-insensitive) or creates one. Only columns in the file are written on update.
+  Errors come back per line as codes (the site translates them) and then nothing is written.
 - First admin: `uv run python -m app.scripts.create_admin <email>`, or `ADMIN_EMAIL` + `ADMIN_PASSWORD`
   env vars (created on startup by `app/services/admin_bootstrap.py` only while no admin exists).
 - Tests: the `client` fixture is logged in as an admin; use `anon_client` for anonymous requests

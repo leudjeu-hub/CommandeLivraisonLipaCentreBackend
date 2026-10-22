@@ -1,7 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.deps import ProductServiceDep, require_admin
-from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
+from app.core.deps import ProductServiceDep, SessionDep, require_admin
+from app.schemas.product import (
+    CatalogueImport,
+    CatalogueImportReport,
+    ProductCreate,
+    ProductRead,
+    ProductUpdate,
+)
+from app.services.catalogue_import import import_catalogue
 
 router = APIRouter()
 
@@ -27,6 +34,14 @@ async def get_product(product_id: int, service: ProductServiceDep) -> ProductRea
 )
 async def create_product(data: ProductCreate, service: ProductServiceDep) -> ProductRead:
     return ProductRead.model_validate(await service.create(data))
+
+
+@router.post("/import", response_model=CatalogueImportReport, dependencies=ADMIN_ONLY)
+async def import_products(data: CatalogueImport, session: SessionDep) -> CatalogueImportReport:
+    """Create or update products from a CSV file; nothing is written if any row is invalid."""
+    report = await import_catalogue(session, data.content, apply=not data.dry_run)
+    applied = not data.dry_run and not report.errors
+    return CatalogueImportReport.model_validate({**vars(report), "applied": applied})
 
 
 @router.put("/{product_id}", response_model=ProductRead, dependencies=ADMIN_ONLY)
