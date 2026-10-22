@@ -8,7 +8,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import Base, async_session_maker, engine, get_async_session
-from app.core.rate_limit import login_throttle
+from app.core.rate_limit import login_throttle, register_throttle
 from app.main import app
 from app.models.user import UserRole
 from app.services.auth_service import AuthService
@@ -28,6 +28,7 @@ async def create_tables():
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     login_throttle.reset()
+    register_throttle.reset()
     yield
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)

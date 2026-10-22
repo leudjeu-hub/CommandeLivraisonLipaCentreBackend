@@ -5,7 +5,7 @@ from sqlalchemy import select, update
 
 from app.core.db import async_session_maker
 from app.core.exceptions import EmailAlreadyUsedError
-from app.core.rate_limit import MAX_FAILURES
+from app.core.rate_limit import MAX_FAILURES, MAX_REGISTRATIONS
 from app.core.security import hash_password, verify_password
 from app.models.user import AuthToken, User, UserRole
 from app.scripts.create_admin import create_admin
@@ -259,3 +259,15 @@ async def test_catalogue_is_gzipped(anon_client: AsyncClient, client: AsyncClien
     assert response.status_code == 200
     assert response.headers["content-encoding"] == "gzip"
     assert len(response.json()) == 30
+
+
+async def test_registrations_are_limited_site_wide(anon_client: AsyncClient) -> None:
+    for i in range(MAX_REGISTRATIONS):
+        new = {"email": f"client{i}@exemple.cm", "password": "motdepasse"}
+        assert (await anon_client.post("/auth/register", json=new)).status_code == 201
+    # Once the limit is reached, every new sign-up waits (the limit is site-wide)
+    extra = {"email": "encore@exemple.cm", "password": "motdepasse"}
+    assert (await anon_client.post("/auth/register", json=extra)).status_code == 429
+    # Logging in is not affected
+    login = {"email": "client0@exemple.cm", "password": "motdepasse"}
+    assert (await anon_client.post("/auth/login", json=login)).status_code == 200

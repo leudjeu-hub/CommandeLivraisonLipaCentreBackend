@@ -2,7 +2,7 @@ from fastapi import APIRouter, status
 
 from app.core.deps import AuthServiceDep, CurrentUserDep, TokenDep
 from app.core.exceptions import InvalidCredentialsError, TooManyAttemptsError
-from app.core.rate_limit import login_throttle
+from app.core.rate_limit import ALL, login_throttle, register_throttle
 from app.schemas.auth import Credentials, LoginRequest, TokenRead, UserRead
 from app.services.auth_service import normalize_email
 
@@ -11,8 +11,11 @@ router = APIRouter()
 
 @router.post("/register", response_model=TokenRead, status_code=status.HTTP_201_CREATED)
 async def register(data: Credentials, service: AuthServiceDep) -> TokenRead:
-    """Create a customer account (role ``user``) and log it in."""
+    """Create a customer account (role ``user``) and log it in. Site-wide limit: see rate_limit."""
+    if register_throttle.is_blocked(ALL):
+        raise TooManyAttemptsError()
     user = await service.register(data.email, data.password)
+    register_throttle.record_failure(ALL)
     token = await service.create_token(user)
     return TokenRead(token=token, user=UserRead.model_validate(user))
 
