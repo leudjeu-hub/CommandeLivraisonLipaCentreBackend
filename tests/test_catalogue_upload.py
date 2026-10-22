@@ -130,3 +130,14 @@ async def test_import_is_admin_only(anon_client: AsyncClient) -> None:
             "/products/import", json=body, headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 403
+
+
+async def test_family_column(client: AsyncClient) -> None:
+    pen = await add(client, "Stylo")
+    report = await upload(client, f"id;famille\n{pen};Stylos et crayons\n")
+    assert report["updated"] == 1
+    assert (await client.get(f"/products/{pen}")).json()["family"] == "Stylos et crayons"
+    await upload(client, f"id;famille\n{pen};\n")
+    assert (await client.get(f"/products/{pen}")).json()["family"] is None
+    report = await upload(client, "categorie;nom;famille\nLivres;Bled CE2;" + "x" * 61 + "\n")
+    assert [(e["code"], e["column"]) for e in report["errors"]] == [("too_long", "famille")]

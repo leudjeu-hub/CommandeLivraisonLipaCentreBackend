@@ -58,7 +58,8 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   change their own entries. Times are stored naive UTC and returned with a zone; a break is the gap between
   two entries. A partial unique index allows one open entry per person.
 - Catalogue import (`POST /products/import`, admin only, `app/services/catalogue_import.py`): JSON
-  `{content, dry_run}` with the CSV text (French headers `id;categorie;prix;nom;…`, `;` or `,`).
+  `{content, dry_run}` with the CSV text (French headers `id;categorie;prix;nom;famille;…`, `;` or `,`).
+  `Product.family` is a free-text sub-category (≤ 60 chars) the site groups the catalogue by.
   A row with `id` updates that product (unknown id = error), without `id` it updates the product of
   the same name (case-insensitive) or creates one. Only columns in the file are written on update.
   Errors come back per line as codes (the site translates them) and then nothing is written.
