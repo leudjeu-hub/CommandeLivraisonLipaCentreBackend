@@ -29,6 +29,7 @@ COLUMNS = {
     "categorie": "category",
     "prix": "price",
     "nom": "name",
+    "famille": "family",
     "description": "description",
     "vignette": "label",
     "nom_en": "name_en",
@@ -42,6 +43,7 @@ COLUMNS = {
 }
 TEXT_LIMITS = {
     "name": 255,
+    "family": 60,
     "description": 500,
     "label": 255,
     "name_en": 255,

@@ -9,6 +9,7 @@ class ProductCreate(BaseModel):
     category: ProductCategory
     price: float | None = Field(default=None, gt=0)
     name: str = Field(min_length=1, max_length=255)
+    family: str | None = Field(default=None, max_length=60)
     description: str = Field(default="", max_length=500)
     label: str | None = Field(default=None, max_length=255)
     name_en: str | None = Field(default=None, max_length=255)
@@ -25,6 +26,7 @@ class ProductUpdate(BaseModel):
     category: ProductCategory | None = None
     price: float | None = Field(default=None, gt=0)
     name: str | None = Field(default=None, min_length=1, max_length=255)
+    family: str | None = Field(default=None, max_length=60)
     description: str | None = Field(default=None, max_length=500)
     label: str | None = Field(default=None, max_length=255)
     name_en: str | None = Field(default=None, max_length=255)
@@ -44,6 +46,7 @@ class ProductRead(BaseModel):
     category: ProductCategory
     price: float | None
     name: str
+    family: str | None
     description: str
     label: str | None
     name_en: str | None

@@ -29,6 +29,8 @@ class Product(Base):
     # None means "price on request" (sur devis).
     price: Mapped[float | None] = mapped_column(Float, nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    # Free-text sub-category shown on the site ("Sacs et cartables"); None = not grouped.
+    family: Mapped[str | None] = mapped_column(String(60), nullable=True)
     description: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     label: Mapped[str | None] = mapped_column(String(255), nullable=True)
     name_en: Mapped[str | None] = mapped_column(String(255), nullable=True)

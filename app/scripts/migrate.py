@@ -25,7 +25,10 @@ def detect_unversioned_revision(conn: Connection) -> str | None:
         return None
     if "time_entries" in tables:
         users = {column["name"] for column in inspector.get_columns("users")}
-        return "head" if "is_active" in users else "0004"
+        if "is_active" not in users:
+            return "0004"
+        products = {column["name"] for column in inspector.get_columns("products")}
+        return "head" if "family" in products else "0005"
     if "users" in tables:
         return "0003"
     columns = {column["name"] for column in inspector.get_columns("products")}
