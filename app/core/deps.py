@@ -9,6 +9,7 @@ from app.models.user import User, UserRole
 from app.services.auth_service import AuthService
 from app.services.order_service import OrderService
 from app.services.product_service import ProductService
+from app.services.time_service import TimeService
 
 SessionDep = Annotated[AsyncSession, Depends(get_async_session)]
 
@@ -27,7 +28,14 @@ async def get_auth_service(session: SessionDep) -> AuthService:
 
 ProductServiceDep = Annotated[ProductService, Depends(get_product_service)]
 OrderServiceDep = Annotated[OrderService, Depends(get_order_service)]
+
+
+async def get_time_service(session: SessionDep) -> TimeService:
+    return TimeService(session)
+
+
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+TimeServiceDep = Annotated[TimeService, Depends(get_time_service)]
 
 # auto_error=False: a missing header gets our 401 (with WWW-Authenticate) instead of a 403.
 bearer = HTTPBearer(auto_error=False)
@@ -65,3 +73,14 @@ async def require_admin(user: CurrentUserDep) -> User:
     if user.role != UserRole.ADMIN:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Administrator access required")
     return user
+
+
+async def require_staff(user: CurrentUserDep) -> User:
+    """Employees and administrators: the people who clock in and out."""
+    if user.role not in (UserRole.EMPLOYEE, UserRole.ADMIN):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Staff access required")
+    return user
+
+
+StaffDep = Annotated[User, Depends(require_staff)]
+AdminDep = Annotated[User, Depends(require_admin)]

@@ -11,6 +11,8 @@ from app.core.db import Base
 
 class UserRole(enum.StrEnum):
     USER = "user"
+    # Staff who clock in and out (see TimeEntry); administrators can clock in too.
+    EMPLOYEE = "employee"
     ADMIN = "admin"
 
 
