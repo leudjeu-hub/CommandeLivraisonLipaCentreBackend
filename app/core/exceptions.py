@@ -60,6 +60,11 @@ class LastAdminError(AppError):
     detail = "The last administrator cannot be demoted, blocked or deleted"
 
 
+class TooManyAttemptsError(AppError):
+    status_code = 429
+    detail = "Too many failed attempts; try again in a few minutes"
+
+
 class AccountBlockedError(AppError):
     status_code = 403
     detail = "This account is blocked"

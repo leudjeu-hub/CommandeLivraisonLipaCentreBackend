@@ -5,6 +5,7 @@ from sqlalchemy import select, update
 
 from app.core.db import async_session_maker
 from app.core.exceptions import EmailAlreadyUsedError
+from app.core.rate_limit import MAX_FAILURES
 from app.core.security import hash_password, verify_password
 from app.models.user import AuthToken, User, UserRole
 from app.scripts.create_admin import create_admin
@@ -114,9 +115,7 @@ async def test_product_writes_require_admin(anon_client: AsyncClient) -> None:
     assert (await anon_client.get("/products/")).status_code == 200
 
 
-async def test_orders_public_to_create_admin_to_read(
-    client: AsyncClient, anon_client: AsyncClient
-) -> None:
+async def test_orders_are_admin_only(client: AsyncClient, anon_client: AsyncClient) -> None:
     product = (await client.post("/products/", json=PRODUCT)).json()
     admin_auth = client.headers.pop("Authorization")  # same underlying client: go anonymous
 
@@ -128,8 +127,20 @@ async def test_orders_public_to_create_admin_to_read(
             "items": [{"product_id": product["id"], "quantity": 1}],
         },
     )
+    # Creating an order takes stock: anonymous visitors must not be able to empty it.
+    assert order.status_code == 401
+    anon_client.headers["Authorization"] = admin_auth
+    order = await anon_client.post(
+        "/orders/",
+        json={
+            "customer_name": "Awa",
+            "phone": "+237600000000",
+            "items": [{"product_id": product["id"], "quantity": 1}],
+        },
+    )
     assert order.status_code == 201
     order_id = order.json()["id"]
+    anon_client.headers.pop("Authorization")
     assert (await anon_client.get("/orders/")).status_code == 401
     assert (await anon_client.get(f"/orders/{order_id}")).status_code == 401
     status = await anon_client.patch(f"/orders/{order_id}/status", json={"status": "confirmed"})
@@ -210,3 +221,41 @@ async def test_register_race_on_same_email_gives_409() -> None:
 
 async def _none() -> None:
     return None
+
+
+async def test_login_is_throttled_after_repeated_failures(anon_client: AsyncClient) -> None:
+    await anon_client.post(
+        "/auth/register", json={"email": "c@exemple.cm", "password": "motdepasse"}
+    )
+    wrong = {"email": "C@exemple.cm", "password": "mauvais"}
+    for _ in range(MAX_FAILURES):
+        assert (await anon_client.post("/auth/login", json=wrong)).status_code == 401
+    # Even the right password is refused while the e-mail is throttled
+    right = {"email": "c@exemple.cm", "password": "motdepasse"}
+    assert (await anon_client.post("/auth/login", json=right)).status_code == 429
+    # Other accounts are not affected
+    other = {"email": "autre@exemple.cm", "password": "x"}
+    assert (await anon_client.post("/auth/login", json=other)).status_code == 401
+
+
+async def test_success_resets_failed_login_count(anon_client: AsyncClient) -> None:
+    await anon_client.post(
+        "/auth/register", json={"email": "c@exemple.cm", "password": "motdepasse"}
+    )
+    wrong = {"email": "c@exemple.cm", "password": "mauvais"}
+    right = {"email": "c@exemple.cm", "password": "motdepasse"}
+    for _ in range(MAX_FAILURES - 1):
+        await anon_client.post("/auth/login", json=wrong)
+    assert (await anon_client.post("/auth/login", json=right)).status_code == 200
+    for _ in range(MAX_FAILURES - 1):
+        await anon_client.post("/auth/login", json=wrong)
+    assert (await anon_client.post("/auth/login", json=right)).status_code == 200
+
+
+async def test_catalogue_is_gzipped(anon_client: AsyncClient, client: AsyncClient) -> None:
+    for i in range(30):
+        await client.post("/products/", json={**PRODUCT, "name": f"Cahier {i}"})
+    response = await anon_client.get("/products/", headers={"Accept-Encoding": "gzip"})
+    assert response.status_code == 200
+    assert response.headers["content-encoding"] == "gzip"
+    assert len(response.json()) == 30

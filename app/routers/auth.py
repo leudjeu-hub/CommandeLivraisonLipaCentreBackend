@@ -1,7 +1,10 @@
 from fastapi import APIRouter, status
 
 from app.core.deps import AuthServiceDep, CurrentUserDep, TokenDep
+from app.core.exceptions import InvalidCredentialsError, TooManyAttemptsError
+from app.core.rate_limit import login_throttle
 from app.schemas.auth import Credentials, LoginRequest, TokenRead, UserRead
+from app.services.auth_service import normalize_email
 
 router = APIRouter()
 
@@ -16,7 +19,16 @@ async def register(data: Credentials, service: AuthServiceDep) -> TokenRead:
 
 @router.post("/login", response_model=TokenRead)
 async def login(data: LoginRequest, service: AuthServiceDep) -> TokenRead:
-    user = await service.authenticate(data.email, data.password)
+    """Log in. Too many wrong passwords for one e-mail get 429 for a while (password guessing)."""
+    key = normalize_email(data.email)
+    if login_throttle.is_blocked(key):
+        raise TooManyAttemptsError()
+    try:
+        user = await service.authenticate(data.email, data.password)
+    except InvalidCredentialsError:
+        login_throttle.record_failure(key)
+        raise
+    login_throttle.reset(key)
     token = await service.create_token(user)
     return TokenRead(token=token, user=UserRead.model_validate(user))
 
