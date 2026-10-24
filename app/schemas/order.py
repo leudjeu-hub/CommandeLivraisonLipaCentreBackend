@@ -68,14 +68,15 @@ class OrderRead(BaseModel):
     payment: str | None
     notes: str | None
     created_at: datetime
+    status_changed_at: datetime | None
     items: list[OrderItemRead]
     whatsapp_url: str | None = None
 
-    @field_validator("created_at")
+    @field_validator("created_at", "status_changed_at")
     @classmethod
-    def _as_utc(cls, value: datetime) -> datetime:
+    def _as_utc(cls, value: datetime | None) -> datetime | None:
         """Stored times are naive UTC: say so, so browsers convert them to local time."""
-        return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+        return value.replace(tzinfo=UTC) if value is not None and value.tzinfo is None else value
 
 
 class OrderStatusUpdate(BaseModel):

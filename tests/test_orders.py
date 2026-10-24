@@ -221,3 +221,37 @@ async def test_order_enums_stored_as_values(anon_client: AsyncClient) -> None:
     async with async_session_maker() as session:
         row = (await session.execute(text("SELECT status, kind FROM orders"))).one()
     assert tuple(row) == ("new", "quote")
+
+
+async def test_cancelled_orders_deleted_after_30_days(client: AsyncClient) -> None:
+    from datetime import timedelta
+
+    from sqlalchemy import update
+
+    from app.core.db import async_session_maker
+    from app.models.order import Order
+    from app.services.order_service import utcnow
+
+    pen = await _create_product(client, "Stylo", 500, 10)
+    item = {"items": [{"product_id": pen, "quantity": 1}]}
+    old, recent, delivered = [
+        (await client.post("/orders/submit", json={**SUBMIT, **item})).json()["id"]
+        for _ in range(3)
+    ]
+    for order_id, status in ((old, "cancelled"), (recent, "cancelled"), (delivered, "delivered")):
+        body = (await client.patch(f"/orders/{order_id}/status", json={"status": status})).json()
+        assert body["status_changed_at"] is not None
+    long_ago = utcnow() - timedelta(days=31)
+    async with async_session_maker() as session:
+        await session.execute(
+            update(Order)
+            .where(Order.id.in_([old, delivered]))
+            .values(status_changed_at=long_ago, created_at=long_ago)
+        )
+        await session.commit()
+
+    ids = [o["id"] for o in (await client.get("/orders/")).json()]
+    assert sorted(ids) == sorted([recent, delivered])
+    assert (await client.get(f"/orders/{old}")).status_code == 404
+    # The product stays: only the order and its lines are deleted
+    assert any(p["id"] == pen for p in (await client.get("/products/")).json())

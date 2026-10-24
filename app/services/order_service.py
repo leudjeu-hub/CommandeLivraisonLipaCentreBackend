@@ -1,6 +1,7 @@
 from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
@@ -13,6 +14,14 @@ from app.models.order_item import OrderItem
 from app.models.product import Product
 from app.schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderSubmit
 from app.utils.whatsapp import build_whatsapp_link
+
+# Cancelled orders are deleted this long after their cancellation (Render's free plan has no
+# scheduler: the purge runs whenever an administrator lists the orders)
+CANCELLED_RETENTION = timedelta(days=30)
+
+
+def utcnow() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class OrderService:
@@ -73,7 +82,23 @@ class OrderService:
         await self.session.refresh(order)
         return order
 
+    async def purge_cancelled(self) -> int:
+        """Delete orders cancelled more than CANCELLED_RETENTION ago; returns how many."""
+        cutoff = utcnow() - CANCELLED_RETENTION
+        # Cancelled before status_changed_at existed: count from the order's creation
+        changed = func.coalesce(Order.status_changed_at, Order.created_at)
+        result = await self.session.execute(
+            select(Order).where(Order.status == OrderStatus.CANCELLED, changed < cutoff)
+        )
+        orders = result.scalars().all()
+        for order in orders:
+            await self.session.delete(order)
+        if orders:
+            await self.session.commit()
+        return len(orders)
+
     async def list(self, status: OrderStatus | None = None) -> Sequence[Order]:
+        await self.purge_cancelled()
         query = select(Order).order_by(Order.created_at.desc(), Order.id.desc())
         if status is not None:
             query = query.where(Order.status == status)
@@ -87,7 +112,9 @@ class OrderService:
         order = await self.get(order_id)
         if order is None:
             return None
-        order.status = data.status
+        if order.status != data.status:
+            order.status = data.status
+            order.status_changed_at = utcnow()
         await self.session.commit()
         await self.session.refresh(order)
         return order
