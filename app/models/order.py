@@ -32,14 +32,26 @@ class Order(Base):
     customer_name: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[OrderStatus] = mapped_column(
-        Enum(OrderStatus, native_enum=False, length=20),
+        Enum(
+            OrderStatus,
+            native_enum=False,
+            length=20,
+            # Store the values ('new'), as the migrations' CHECK constraints expect, not the names
+            values_callable=lambda e: [m.value for m in e],
+        ),
         nullable=False,
         default=OrderStatus.NEW,
     )
     total: Mapped[float] = mapped_column(Float, nullable=False, default=0)
     # Filled by the site's order form (POST /orders/submit); empty for orders entered by an admin
     kind: Mapped[OrderKind] = mapped_column(
-        Enum(OrderKind, native_enum=False, length=10),
+        Enum(
+            OrderKind,
+            native_enum=False,
+            length=10,
+            # Store the values ('new'), as the migrations' CHECK constraints expect, not the names
+            values_callable=lambda e: [m.value for m in e],
+        ),
         nullable=False,
         default=OrderKind.ORDER,
         server_default=OrderKind.ORDER.value,
