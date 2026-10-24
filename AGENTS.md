@@ -49,8 +49,8 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   blocked or deleted). `User.is_active`: a blocked account gets 403 on login (after the password
   check) and its tokens stop working. `/users/{id}/active` blocks or unblocks; `DELETE /users/{id}`
   refuses an account with recorded hours (409) — block it instead. No one can block or delete themselves.
-- `app/core/deps.py` — `CurrentUserDep` (401) and `require_admin` (403). Product writes, order reads
-  and status updates, and `/users` are admin-only; `GET /products` stays public. `POST /orders` is
+- `app/core/deps.py` — `CurrentUserDep` (401) and `require_admin` (403). Product writes and `/users` are
+  admin-only; order reads and status updates need `require_manager` (manager or admin); `GET /products` stays public. `POST /orders` is
   admin-only too (it takes stock). The site's form calls the public `POST /orders/submit`
   (`OrderService.submit`: catalogue prices, no stock taken, delivery details, `order_throttle`
   60/hour site-wide); the site's Gestion > Commandes tab lists them and changes their status. `status_changed_at` (naive UTC)

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.deps import OrderServiceDep, require_admin
+from app.core.deps import OrderServiceDep, require_admin, require_manager
 from app.core.exceptions import TooManyOrdersError
 from app.core.rate_limit import ALL, order_throttle
 from app.models.order import OrderStatus
@@ -9,9 +9,11 @@ from app.services.order_service import to_order_read
 
 router = APIRouter()
 
-# Administrators only, except POST /submit (the site's form). Orders hold customers' names and
-# phone numbers, and POST / takes stock: left public, anyone could empty the stock.
+# Orders hold customers' names and phone numbers: managers and administrators read them and
+# change their status; POST / takes stock, so it stays admin-only; POST /submit (the site's
+# form) is public.
 ADMIN_ONLY = [Depends(require_admin)]
+MANAGERS = [Depends(require_manager)]
 
 
 @router.post("/submit", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
@@ -33,14 +35,14 @@ async def create_order(data: OrderCreate, service: OrderServiceDep) -> OrderRead
     return to_order_read(order)
 
 
-@router.get("/", response_model=list[OrderRead], dependencies=ADMIN_ONLY)
+@router.get("/", response_model=list[OrderRead], dependencies=MANAGERS)
 async def list_orders(
     service: OrderServiceDep, status: OrderStatus | None = None
 ) -> list[OrderRead]:
     return [to_order_read(order) for order in await service.list(status)]
 
 
-@router.get("/{order_id}", response_model=OrderRead, dependencies=ADMIN_ONLY)
+@router.get("/{order_id}", response_model=OrderRead, dependencies=MANAGERS)
 async def get_order(order_id: int, service: OrderServiceDep) -> OrderRead:
     order = await service.get(order_id)
     if order is None:
@@ -48,7 +50,7 @@ async def get_order(order_id: int, service: OrderServiceDep) -> OrderRead:
     return to_order_read(order)
 
 
-@router.patch("/{order_id}/status", response_model=OrderRead, dependencies=ADMIN_ONLY)
+@router.patch("/{order_id}/status", response_model=OrderRead, dependencies=MANAGERS)
 async def update_order_status(
     order_id: int, data: OrderStatusUpdate, service: OrderServiceDep
 ) -> OrderRead:
