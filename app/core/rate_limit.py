@@ -6,6 +6,8 @@
 - Sign-ups: at most ``MAX_REGISTRATIONS`` new accounts per ``REGISTER_WINDOW_SECONDS`` for the
   whole site (customers do not need an account; the shop expects a handful a day), so a script
   cannot fill the database with accounts.
+- Orders from the site's form: at most ``MAX_ORDERS`` per ``ORDER_WINDOW_SECONDS`` site-wide
+  (``POST /orders/submit`` needs no account).
 
 Keyed by e-mail or site-wide rather than by IP: behind Render's proxy every client shares the
 proxy's address, and X-Forwarded-For can be forged.
@@ -18,6 +20,8 @@ MAX_FAILURES = 10
 WINDOW_SECONDS = 15 * 60
 MAX_REGISTRATIONS = 30
 REGISTER_WINDOW_SECONDS = 60 * 60
+MAX_ORDERS = 60
+ORDER_WINDOW_SECONDS = 60 * 60
 # Beyond this many tracked e-mails, stale ones are dropped so memory stays bounded.
 MAX_KEYS = 10_000
 
@@ -57,5 +61,6 @@ class Throttle:
 
 login_throttle = Throttle(MAX_FAILURES, WINDOW_SECONDS)
 register_throttle = Throttle(MAX_REGISTRATIONS, REGISTER_WINDOW_SECONDS)
-# The single key of register_throttle (the limit is site-wide)
+order_throttle = Throttle(MAX_ORDERS, ORDER_WINDOW_SECONDS)
+# The single key of register_throttle and order_throttle (the limits are site-wide)
 ALL = "*"
