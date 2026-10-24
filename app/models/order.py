@@ -64,6 +64,8 @@ class Order(Base):
     # As shown to the customer by the site (zone rules live there); None = to be agreed
     delivery_fee: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
+    # Naive UTC, set when the status changes: cancelled orders are deleted 30 days after it
+    status_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     items: Mapped[list[OrderItem]] = relationship(
         back_populates="order",
         cascade="all, delete-orphan",
