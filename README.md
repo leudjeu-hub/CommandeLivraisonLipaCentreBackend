@@ -179,8 +179,9 @@ once the account exists. Further administrators can be promoted from `/admin` or
 | POST | `/products/` | Admin | Create a product |
 | PUT | `/products/{product_id}` | Admin | Update a product |
 | DELETE | `/products/{product_id}` | Admin | Delete a product |
-| POST | `/orders/` | Admin | Place an order; the response includes a WhatsApp link |
-| GET | `/orders/` | Admin | List orders |
+| POST | `/orders/` | Admin | Place an order (takes stock); the response includes a WhatsApp link |
+| POST | `/orders/submit` | Public | Record an order or quote from the site's form (no stock taken, 60/hour site-wide) |
+| GET | `/orders/` | Admin | List orders, newest first (`?status=new` to filter) |
 | GET | `/orders/{order_id}` | Admin | Get an order |
 | PATCH | `/orders/{order_id}/status` | Admin | Update an order status |
 | POST | `/auth/register` | Public | Create a customer account and sign in |
@@ -194,8 +195,11 @@ Send the login token in the `Authorization: Bearer <token>` header. Missing or i
 receive `401`; a signed-in customer attempting an admin-only operation receives `403`.
 
 Accounts have a `user` or `admin` role. The last administrator cannot be demoted. Orders are
-admin-only: they contain customer contact details, and creating one takes stock (left public,
-anyone could empty it). The site does not use them; customers order by WhatsApp. After 10 wrong
+admin-only: they contain customer contact details, and `POST /orders/` takes stock (left public,
+anyone could empty it). The one exception is `POST /orders/submit`: the site's form records each
+order or quote there (delivery area, address, slot, payment, notes, fee shown to the customer) and the
+customer still sends it by WhatsApp or e-mail; it takes no stock, uses catalogue prices, and answers
+`429` after 60 orders within an hour (site-wide). After 10 wrong
 passwords for one e-mail within 15 minutes, `/auth/login` answers `429` for that e-mail; after 30
 new accounts within an hour (site-wide), `/auth/register` answers `429`. Responses
 over 1 KB are gzipped (the full catalogue drops from ~470 KB to ~40 KB). Order statuses are `new`, `confirmed`, `delivered`, and

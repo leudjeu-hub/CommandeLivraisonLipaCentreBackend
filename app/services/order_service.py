@@ -8,10 +8,10 @@ from app.core.exceptions import (
     PriceOnRequestError,
     ProductNotFoundError,
 )
-from app.models.order import Order
+from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem
 from app.models.product import Product
-from app.schemas.order import OrderCreate, OrderRead, OrderStatusUpdate
+from app.schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderSubmit
 from app.utils.whatsapp import build_whatsapp_link
 
 
@@ -45,8 +45,39 @@ class OrderService:
         await self.session.refresh(order)
         return order
 
-    async def list(self) -> Sequence[Order]:
-        result = await self.session.execute(select(Order).order_by(Order.created_at.desc()))
+    async def submit(self, data: OrderSubmit) -> Order:
+        """Record an order or quote sent by the site, at catalogue prices, without taking stock."""
+        order = Order(
+            kind=data.kind,
+            customer_name=data.customer_name.strip(),
+            phone=data.phone.strip(),
+            area=data.area.strip() or None,
+            address=data.address.strip() or None,
+            slot=data.slot.strip() or None,
+            payment=data.payment.strip() or None,
+            notes=data.notes.strip() or None,
+            delivery_fee=data.delivery_fee,
+        )
+        total = 0.0
+        for item in data.items:
+            product = await self.session.get(Product, item.product_id)
+            if product is None:
+                raise ProductNotFoundError(item.product_id)
+            # Price on request: kept at 0, the shop quotes it
+            price = product.price or 0.0
+            total += price * item.quantity
+            order.items.append(OrderItem(product=product, quantity=item.quantity, unit_price=price))
+        order.total = total
+        self.session.add(order)
+        await self.session.commit()
+        await self.session.refresh(order)
+        return order
+
+    async def list(self, status: OrderStatus | None = None) -> Sequence[Order]:
+        query = select(Order).order_by(Order.created_at.desc(), Order.id.desc())
+        if status is not None:
+            query = query.where(Order.status == status)
+        result = await self.session.execute(query)
         return result.scalars().all()
 
     async def get(self, order_id: int) -> Order | None:

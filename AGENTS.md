@@ -51,7 +51,9 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   refuses an account with recorded hours (409) — block it instead. No one can block or delete themselves.
 - `app/core/deps.py` — `CurrentUserDep` (401) and `require_admin` (403). Product writes, order reads
   and status updates, and `/users` are admin-only; `GET /products` stays public. `POST /orders` is
-  admin-only too (it takes stock; the site orders by WhatsApp and never calls it).
+  admin-only too (it takes stock). The site's form calls the public `POST /orders/submit`
+  (`OrderService.submit`: catalogue prices, no stock taken, delivery details, `order_throttle`
+  60/hour site-wide); the site's Gestion > Commandes tab lists them and changes their status.
 - `app/core/rate_limit.py` — in-memory throttles: failed logins per e-mail (10 / 15 min → 429) and
   new accounts site-wide (30 / hour → 429),
   reset in `tests/conftest.py`. `GZipMiddleware` compresses responses over 1 KB (catalogue on 3G).

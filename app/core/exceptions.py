@@ -65,6 +65,11 @@ class TooManyAttemptsError(AppError):
     detail = "Too many failed attempts; try again in a few minutes"
 
 
+class TooManyOrdersError(AppError):
+    status_code = 429
+    detail = "Too many orders right now; send it by WhatsApp or try again later"
+
+
 class AccountBlockedError(AppError):
     status_code = 403
     detail = "This account is blocked"
