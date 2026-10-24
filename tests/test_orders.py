@@ -209,3 +209,15 @@ async def test_list_orders_by_status(client: AsyncClient) -> None:
 
 async def test_orders_list_is_admin_only(anon_client: AsyncClient) -> None:
     assert (await anon_client.get("/orders/")).status_code == 401
+
+
+async def test_order_enums_stored_as_values(anon_client: AsyncClient) -> None:
+    """The migrations' CHECK constraints accept 'new', 'order'…: enum names ('NEW') would fail."""
+    from sqlalchemy import text
+
+    from app.core.db import async_session_maker
+
+    await anon_client.post("/orders/submit", json={**SUBMIT, "kind": "quote"})
+    async with async_session_maker() as session:
+        row = (await session.execute(text("SELECT status, kind FROM orders"))).one()
+    assert tuple(row) == ("new", "quote")
