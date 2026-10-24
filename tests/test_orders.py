@@ -255,3 +255,31 @@ async def test_cancelled_orders_deleted_after_30_days(client: AsyncClient) -> No
     assert (await client.get(f"/orders/{old}")).status_code == 404
     # The product stays: only the order and its lines are deleted
     assert any(p["id"] == pen for p in (await client.get("/products/")).json())
+
+
+async def test_managers_manage_orders_but_others_do_not(anon_client: AsyncClient) -> None:
+    from app.models.user import UserRole
+    from tests.conftest import make_user
+
+    order_id = (await anon_client.post("/orders/submit", json={**SUBMIT, "kind": "quote"})).json()[
+        "id"
+    ]
+    manager = await make_user("resp@exemple.cm", "motdepasse", UserRole.MANAGER)
+    headers = {"Authorization": f"Bearer {manager}"}
+    assert (await anon_client.get("/orders/", headers=headers)).status_code == 200
+    assert (await anon_client.get(f"/orders/{order_id}", headers=headers)).status_code == 200
+    response = await anon_client.patch(
+        f"/orders/{order_id}/status", json={"status": "confirmed"}, headers=headers
+    )
+    assert response.json()["status"] == "confirmed"
+    # Entering an order by hand takes stock: administrators only
+    created = await anon_client.post(
+        "/orders/",
+        json={"customer_name": "A", "phone": "1", "items": [{"product_id": 1, "quantity": 1}]},
+        headers=headers,
+    )
+    assert created.status_code == 403
+    for role in (UserRole.EMPLOYEE, UserRole.USER):
+        token = await make_user(f"{role.value}@exemple.cm", "motdepasse", role)
+        response = await anon_client.get("/orders/", headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == 403

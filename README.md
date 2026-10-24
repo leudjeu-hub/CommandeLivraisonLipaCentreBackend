@@ -181,9 +181,9 @@ once the account exists. Further administrators can be promoted from `/admin` or
 | DELETE | `/products/{product_id}` | Admin | Delete a product |
 | POST | `/orders/` | Admin | Place an order (takes stock); the response includes a WhatsApp link |
 | POST | `/orders/submit` | Public | Record an order or quote from the site's form (no stock taken, 60/hour site-wide) |
-| GET | `/orders/` | Admin | List orders, newest first (`?status=new` to filter); first deletes orders cancelled more than 30 days ago |
-| GET | `/orders/{order_id}` | Admin | Get an order |
-| PATCH | `/orders/{order_id}/status` | Admin | Update an order status |
+| GET | `/orders/` | Manager, admin | List orders, newest first (`?status=new` to filter); first deletes orders cancelled more than 30 days ago |
+| GET | `/orders/{order_id}` | Manager, admin | Get an order |
+| PATCH | `/orders/{order_id}/status` | Manager, admin | Update an order status |
 | POST | `/auth/register` | Public | Create a customer account and sign in |
 | POST | `/auth/login` | Public | Sign in |
 | POST | `/auth/logout` | Signed in | Revoke the current token |
@@ -194,8 +194,9 @@ once the account exists. Further administrators can be promoted from `/admin` or
 Send the login token in the `Authorization: Bearer <token>` header. Missing or invalid tokens
 receive `401`; a signed-in customer attempting an admin-only operation receives `403`.
 
-Accounts have a `user` or `admin` role. The last administrator cannot be demoted. Orders are
-admin-only: they contain customer contact details, and `POST /orders/` takes stock (left public,
+Accounts have a `user` or `admin` role. The last administrator cannot be demoted. Orders contain
+customer contact details: managers and administrators read them and change their status, and
+only administrators use `POST /orders/`, which takes stock (left public,
 anyone could empty it). The one exception is `POST /orders/submit`: the site's form records each
 order or quote there (delivery area, address, slot, payment, notes, fee shown to the customer) and the
 customer still sends it by WhatsApp or e-mail; it takes no stock, uses catalogue prices, and answers
