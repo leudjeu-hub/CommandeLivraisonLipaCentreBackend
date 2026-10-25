@@ -62,20 +62,3 @@ class AuthToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     user: Mapped[User] = relationship(lazy="selectin")
-
-
-class PasswordResetToken(Base):
-    """A pending "forgot password" link. Only the SHA-256 of the token is stored; it is deleted
-    when used, when a newer link is requested, or with the account."""
-
-    __tablename__ = "password_reset_tokens"
-
-    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
-    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    user: Mapped[User] = relationship(lazy="selectin")

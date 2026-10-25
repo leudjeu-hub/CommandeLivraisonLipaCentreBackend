@@ -70,11 +70,6 @@ class TooManyOrdersError(AppError):
     detail = "Too many orders right now; send it by WhatsApp or try again later"
 
 
-class InvalidResetTokenError(AppError):
-    status_code = 400
-    detail = "This reset link is invalid or has expired"
-
-
 class AccountBlockedError(AppError):
     status_code = 403
     detail = "This account is blocked"
