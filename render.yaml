@@ -1,6 +1,7 @@
 # Render Blueprint: https://render.com/docs/blueprint-spec
 # DATABASE_URL (Neon) and SHOP_WHATSAPP come from the CommandeLivraisonLipaCentreGroup
-# environment group, which must exist in the Render dashboard.
+# environment group, which must exist in the Render dashboard. BREVO_API_KEY (forgotten password
+# e-mails) belongs there too: it is a secret.
 services:
   - type: web
     name: papeterie-api

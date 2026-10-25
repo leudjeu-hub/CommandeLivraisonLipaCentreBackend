@@ -51,6 +51,14 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   refuses an account with recorded hours (409) — block it instead. No one can block or delete themselves.
 - `User.last_login_at` (naive UTC, nullable): set by `create_token` (login and sign-up, not token reuse);
   only `/users` returns it (`UserAdminRead`), `/auth/*` keeps `UserRead`.
+- Forgotten password (`app/services/password_reset.py`): `POST /auth/password-reset/request {email}`
+  always answers 202 and looks the account up in a background task (no enumeration by answer or
+  timing); an active account gets a link `SITE_URL/nouveau-mot-de-passe#token=…` by e-mail
+  (`app/services/mailer.py`, Brevo HTTP API: Render's free plan blocks SMTP). Only the token's SHA-256
+  is stored (`password_reset_tokens`), valid `PASSWORD_RESET_TTL_MINUTES` (30), one per account (a new
+  request replaces it). `POST /auth/password-reset/confirm {token, password}` → 204, deletes the token
+  and every `AuthToken` of the account, clears its login lockout; bad/expired token → 400. Throttles:
+  3/hour per e-mail (silently dropped), 50/hour site-wide (429). Tests use the `outbox` fixture.
 - `app/core/deps.py` — `CurrentUserDep` (401) and `require_admin` (403). Product writes and `/users` are
   admin-only; order reads and status updates need `require_manager` (manager or admin); `GET /products` stays public. `POST /orders` is
   admin-only too (it takes stock). The site's form calls the public `POST /orders/submit`
