@@ -16,16 +16,6 @@ class LoginRequest(BaseModel):
     password: str = Field(max_length=128)
 
 
-class PasswordResetRequest(BaseModel):
-    # No e-mail validation: any input gets the same answer.
-    email: str = Field(max_length=255)
-
-
-class PasswordResetConfirm(BaseModel):
-    token: str = Field(max_length=128)
-    password: str = Field(min_length=8, max_length=128)
-
-
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

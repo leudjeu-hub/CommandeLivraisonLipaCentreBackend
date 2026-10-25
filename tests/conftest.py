@@ -16,13 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.core.config import get_settings
 from app.core.db import Base, async_session_maker, engine, get_async_session
-from app.core.rate_limit import (
-    login_throttle,
-    order_throttle,
-    register_throttle,
-    reset_email_throttle,
-    reset_throttle,
-)
+from app.core.rate_limit import login_throttle, order_throttle, register_throttle
 from app.main import app
 from app.models.user import UserRole
 from app.services.auth_service import AuthService
@@ -64,8 +58,6 @@ async def create_tables():
     login_throttle.reset()
     register_throttle.reset()
     order_throttle.reset()
-    reset_email_throttle.reset()
-    reset_throttle.reset()
     yield
     if ON_POSTGRES:
         tables = ", ".join(table.name for table in Base.metadata.sorted_tables)
