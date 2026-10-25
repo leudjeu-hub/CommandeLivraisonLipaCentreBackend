@@ -61,6 +61,9 @@ app.add_middleware(
     allow_origins=allow_origins,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Browsers cache the OPTIONS preflight (writes, calls with a token): Chrome caps this at 2 h,
+    # Firefox at 24 h; Starlette's default is 10 min, i.e. an extra round trip per visit on 3G.
+    max_age=86400,
 )
 # The full catalogue (~1,500 products) is ~470 KB of JSON but ~40 KB gzipped: it matters on 3G.
 app.add_middleware(GZipMiddleware, minimum_size=1000)

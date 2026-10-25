@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.core.deps import ProductServiceDep, SessionDep, require_admin
 from app.schemas.product import (
@@ -15,9 +15,15 @@ router = APIRouter()
 # Reading the catalogue is public; creating, editing and deleting products is for administrators.
 ADMIN_ONLY = [Depends(require_admin)]
 
+# The list is public and the same for everyone: browsers may reuse it for a minute, then show the
+# stale copy while refetching in the background for ten more (a revisit on 3G skips ~30 KB gzipped).
+# The site and /admin refetch with `cache: "no-cache"` after an edit: admins never see an old list.
+CATALOGUE_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=600"
+
 
 @router.get("/", response_model=list[ProductRead])
-async def list_products(service: ProductServiceDep) -> list[ProductRead]:
+async def list_products(service: ProductServiceDep, response: Response) -> list[ProductRead]:
+    response.headers["Cache-Control"] = CATALOGUE_CACHE_CONTROL
     return [ProductRead.model_validate(p) for p in await service.list()]
 
 

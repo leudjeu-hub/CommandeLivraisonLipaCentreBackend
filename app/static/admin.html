@@ -272,7 +272,7 @@ function render() {
 
 async function load() {
   try {
-    products = await request(API);
+    products = await request(API, { cache: "no-cache" }); // pas la copie de 60 s du navigateur
     render();
   } catch (error) {
     rows.replaceChildren();
