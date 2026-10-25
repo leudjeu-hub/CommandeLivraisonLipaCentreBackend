@@ -53,7 +53,7 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   only `/users` returns it (`UserAdminRead`), `/auth/*` keeps `UserRead`.
 - Forgotten password (`app/services/password_reset.py`): `POST /auth/password-reset/request {email}`
   always answers 202 and looks the account up in a background task (no enumeration by answer or
-  timing); an active account gets a link `SITE_URL/mot-de-passe/nouveau#token=…` by e-mail
+  timing); an active account gets a link `SITE_URL/nouveau-mot-de-passe#token=…` by e-mail
   (`app/services/mailer.py`, Brevo HTTP API: Render's free plan blocks SMTP). Only the token's SHA-256
   is stored (`password_reset_tokens`), valid `PASSWORD_RESET_TTL_MINUTES` (30), one per account (a new
   request replaces it). `POST /auth/password-reset/confirm {token, password}` → 204, deletes the token

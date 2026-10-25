@@ -68,7 +68,7 @@ control.
 | `BREVO_API_KEY` | Unset | Brevo API key for outgoing e-mail (forgotten password links). Unset: nothing is sent, a warning is logged |
 | `MAIL_FROM` | `Lipacentre237@gmail.com` | Sender address; must be a verified sender in Brevo |
 | `MAIL_FROM_NAME` | `LipaCentre` | Sender name |
-| `SITE_URL` | `https://leudjeu-hub.github.io/CommandeLivraisonLipaCentre` | Site the reset link points to (`/mot-de-passe/nouveau#token=…`) |
+| `SITE_URL` | `https://leudjeu-hub.github.io/CommandeLivraisonLipaCentre` | Site the reset link points to (`/nouveau-mot-de-passe#token=…`) |
 | `PASSWORD_RESET_TTL_MINUTES` | `30` | Lifetime of a reset link |
 
 `SHOP_WHATSAPP` is not a secret but must be set for order responses to contain a usable

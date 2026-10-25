@@ -48,7 +48,7 @@ async def test_reset_flow_sets_password_and_ends_sessions(
     mail = outbox[0]
     assert mail["to"] == "client@exemple.cm"
     assert (
-        "https://leudjeu-hub.github.io/CommandeLivraisonLipaCentre/mot-de-passe/nouveau#token="
+        "https://leudjeu-hub.github.io/CommandeLivraisonLipaCentre/nouveau-mot-de-passe#token="
         in mail["text"]
     )
     token = token_from(mail)

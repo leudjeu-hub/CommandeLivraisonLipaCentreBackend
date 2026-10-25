@@ -22,7 +22,7 @@ from app.services.mailer import send_email
 def reset_link(token: str) -> str:
     # In the fragment, not the query: browsers never send it to a server (GitHub Pages logs,
     # Referer headers).
-    return f"{get_settings().site_url.rstrip('/')}/mot-de-passe/nouveau#token={token}"
+    return f"{get_settings().site_url.rstrip('/')}/nouveau-mot-de-passe#token={token}"
 
 
 def reset_email(link: str, minutes: int) -> tuple[str, str, str]:
