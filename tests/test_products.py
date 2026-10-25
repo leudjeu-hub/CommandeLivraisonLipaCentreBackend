@@ -151,3 +151,22 @@ async def test_admin_page(client: AsyncClient) -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     assert "Gestion des produits" in response.text
+
+
+async def test_list_products_is_cacheable(anon_client: AsyncClient) -> None:
+    response = await anon_client.get("/products/")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "public, max-age=60, stale-while-revalidate=600"
+
+
+async def test_preflight_is_cached_for_a_day(anon_client: AsyncClient) -> None:
+    response = await anon_client.options(
+        "/products/",
+        headers={
+            "Origin": "https://leudjeu-hub.github.io",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization, content-type",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-max-age"] == "86400"

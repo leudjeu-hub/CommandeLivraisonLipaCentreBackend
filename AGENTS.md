@@ -59,6 +59,8 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
 - `app/core/rate_limit.py` — in-memory throttles: failed logins per e-mail (10 / 15 min → 429) and
   new accounts site-wide (30 / hour → 429),
   reset in `tests/conftest.py`. `GZipMiddleware` compresses responses over 1 KB (catalogue on 3G).
+  `GET /products/` sends `Cache-Control: public, max-age=60, stale-while-revalidate=600` (clients
+  refetch with `cache: "no-cache"` after an edit); CORS preflights are cached 24 h (`max_age`).
 - Time clock (`/time`, `app/routers/time_entries.py`, `TimeService`): employees and admins
   (`require_staff`: employee, manager, admin) clock in/out at server time (`/time/me/clock-in`, `/clock-out`, `/current`,
   `/entries`); managers and admins (`require_manager`) list everyone's entries (`/time/staff` for the
