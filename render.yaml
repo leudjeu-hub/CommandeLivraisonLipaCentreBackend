@@ -7,7 +7,8 @@ services:
     runtime: python
     plan: free
     branch: main
-    autoDeploy: true
+    # Deploy a push to main only once its GitHub checks (CI) pass
+    autoDeployTrigger: checksPass
     buildCommand: pip install uv && uv sync --frozen --no-dev
     # Migrations run on every start (idempotent); an empty products table is then seeded.
     startCommand: >-

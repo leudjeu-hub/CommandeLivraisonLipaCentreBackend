@@ -86,6 +86,14 @@ async def admin() -> FileResponse:
     return FileResponse(ADMIN_PAGE)
 
 
-@app.get("/", tags=["Status"])
+# Status routes never touch the database: probes every few minutes (Render, UptimeRobot, the site's
+# wake-up job) would otherwise keep Neon's free compute awake around the clock. HEAD is accepted
+# because UptimeRobot's free monitors send HEAD (FastAPI answers 405 to HEAD on a GET-only route).
+@app.api_route("/", methods=["GET", "HEAD"], tags=["Status"])
 async def status() -> dict[str, str]:
     return {"status": "ok", "app": settings.app_name}
+
+
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["Status"])
+async def health() -> dict[str, str]:
+    return {"status": "ok"}

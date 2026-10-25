@@ -1,0 +1,59 @@
+# Restaure une sauvegarde (workflow « Sauvegarde de la base ») dans la base RESTORE_DATABASE_URL.
+# Les tables de cette base sont remplacées : viser une base vide ou une branche Neon neuve, jamais
+# la production sans l'avoir décidé. Procédure complète : docs/SAUVEGARDE.md.
+name: Restaurer une sauvegarde
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Numéro de l'exécution de « Sauvegarde de la base » (vide = la dernière réussie)"
+        required: false
+      confirmation:
+        description: "Écrire RESTAURER : les tables de RESTORE_DATABASE_URL seront remplacées"
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  restaurer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Confirmation
+        if: inputs.confirmation != 'RESTAURER'
+        run: |
+          echo "::error::Confirmation absente : écrire RESTAURER"
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Choix de la sauvegarde
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID=$(gh run list --workflow sauvegarde-base.yml --status success --limit 1 \
+              --json databaseId --jq '.[0].databaseId')
+          fi
+          [ -n "$RUN_ID" ] || { echo "::error::Aucune sauvegarde réussie"; exit 1; }
+          echo "Sauvegarde de l'exécution $RUN_ID"
+          echo "id=$RUN_ID" >>"$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.run.outputs.id }}
+          github-token: ${{ github.token }}
+          pattern: sauvegarde-neon-*
+          merge-multiple: true
+          path: sauvegarde
+
+      - name: Restauration
+        env:
+          RESTORE_DATABASE_URL: ${{ secrets.RESTORE_DATABASE_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: scripts/sauvegarde.sh restore "$(ls sauvegarde/*.dump.gpg | head -1)"
