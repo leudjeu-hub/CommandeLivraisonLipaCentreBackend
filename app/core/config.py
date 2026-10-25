@@ -23,6 +23,14 @@ class Settings(BaseSettings):
     # First administrator, created on startup when both are set and no admin exists yet.
     admin_email: str | None = None
     admin_password: SecretStr | None = None
+    # Forgotten password: the e-mailed link opens this site page (token in the URL fragment).
+    site_url: str = "https://leudjeu-hub.github.io/CommandeLivraisonLipaCentre"
+    password_reset_ttl_minutes: int = 30
+    # E-mails go out through Brevo's HTTP API (Render's free plan blocks SMTP ports). Without a
+    # key nothing is sent and a warning is logged.
+    brevo_api_key: SecretStr | None = None
+    mail_from: str = "Lipacentre237@gmail.com"
+    mail_from_name: str = "LipaCentre"
 
     @property
     def async_database_url(self) -> str:

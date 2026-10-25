@@ -6,6 +6,9 @@
 - Sign-ups: at most ``MAX_REGISTRATIONS`` new accounts per ``REGISTER_WINDOW_SECONDS`` for the
   whole site (customers do not need an account; the shop expects a handful a day), so a script
   cannot fill the database with accounts.
+- Password reset e-mails: at most ``MAX_RESETS_PER_EMAIL`` per e-mail per hour (further requests
+  are silently dropped, so the answer never changes) and ``MAX_RESETS`` per hour site-wide (429),
+  so the shop's e-mail quota cannot be burnt and nobody's inbox flooded.
 - Orders from the site's form: at most ``MAX_ORDERS`` per ``ORDER_WINDOW_SECONDS`` site-wide
   (``POST /orders/submit`` needs no account).
 
@@ -20,6 +23,9 @@ MAX_FAILURES = 10
 WINDOW_SECONDS = 15 * 60
 MAX_REGISTRATIONS = 30
 REGISTER_WINDOW_SECONDS = 60 * 60
+MAX_RESETS_PER_EMAIL = 3
+MAX_RESETS = 50
+RESET_WINDOW_SECONDS = 60 * 60
 MAX_ORDERS = 60
 ORDER_WINDOW_SECONDS = 60 * 60
 # Beyond this many tracked e-mails, stale ones are dropped so memory stays bounded.
@@ -62,5 +68,7 @@ class Throttle:
 login_throttle = Throttle(MAX_FAILURES, WINDOW_SECONDS)
 register_throttle = Throttle(MAX_REGISTRATIONS, REGISTER_WINDOW_SECONDS)
 order_throttle = Throttle(MAX_ORDERS, ORDER_WINDOW_SECONDS)
-# The single key of register_throttle and order_throttle (the limits are site-wide)
+reset_email_throttle = Throttle(MAX_RESETS_PER_EMAIL, RESET_WINDOW_SECONDS)
+reset_throttle = Throttle(MAX_RESETS, RESET_WINDOW_SECONDS)
+# The single key of register_throttle, order_throttle and reset_throttle (the limits are site-wide)
 ALL = "*"
