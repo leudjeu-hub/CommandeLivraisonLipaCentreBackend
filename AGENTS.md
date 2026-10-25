@@ -100,6 +100,12 @@ around every test. `test.db` is gitignored (`*.db`).
 
 ## CI/CD
 
-- `ci.yaml` — ruff check/format, mypy, pytest on push/PR.
+- `ci.yaml` — ruff check/format, mypy, pytest on push/PR; job `postgres` reruns the whole suite on a
+  PostgreSQL service whose schema comes from `python -m app.scripts.migrate` (`TEST_DATABASE_URL`,
+  see `tests/conftest.py`; tables are truncated between tests, `sqlite_only` marks create_all tests),
+  then `alembic check`. `tests/test_status.py` fails on more than one Alembic head.
+- `sauvegarde-base.yml` — nightly encrypted `pg_dump` of Neon + test restore (`scripts/sauvegarde.sh`,
+  `docs/SAUVEGARDE.md`); `restaurer-sauvegarde.yml` restores one into `RESTORE_DATABASE_URL`.
+- `/` and `/health` never touch the database and answer HEAD (UptimeRobot free monitors use HEAD).
 - `cd.yaml` — Docker build/push to GHCR on tags; Render deploy on `main`/tags
   (needs `RENDER_SERVICE_ID` + `RENDER_API_KEY` secrets).

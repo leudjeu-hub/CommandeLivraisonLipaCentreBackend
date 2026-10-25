@@ -1,0 +1,76 @@
+# Sauvegarde quotidienne chiffrée de la base Neon, puis restauration d'essai de cette sauvegarde
+# dans un PostgreSQL jetable. Mode d'emploi et restauration : docs/SAUVEGARDE.md.
+# Secrets (Settings → Secrets and variables → Actions) : DATABASE_URL, BACKUP_PASSPHRASE.
+# Copie mensuelle facultative dans un dépôt privé : secret BACKUP_REPO_TOKEN + variable BACKUP_REPO.
+name: Sauvegarde de la base
+
+on:
+  schedule:
+    - cron: "15 2 * * *" # 3 h 15 à Yaoundé
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: sauvegarde-base
+  cancel-in-progress: false
+
+jobs:
+  sauvegarde:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      HAS_BACKUP_REPO: ${{ secrets.BACKUP_REPO_TOKEN != '' && vars.BACKUP_REPO != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sauvegarde chiffrée (pg_dump)
+        id: dump
+        run: scripts/sauvegarde.sh dump sauvegarde
+
+      - name: Restauration d'essai
+        run: scripts/sauvegarde.sh verify "${{ steps.dump.outputs.file }}"
+
+      # Le dépôt est public : n'importe quel compte GitHub peut télécharger cet artefact. Il est
+      # chiffré (AES-256) et ne se lit qu'avec BACKUP_PASSPHRASE. 90 jours : le maximum de GitHub.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sauvegarde-neon-${{ github.run_id }}
+          path: ${{ steps.dump.outputs.file }}
+          retention-days: 90
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Copie mensuelle dans le dépôt privé
+        if: env.HAS_BACKUP_REPO == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+          FILE: ${{ steps.dump.outputs.file }}
+        run: |
+          # Le 1er du mois, ou à chaque lancement manuel
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$(date -u +%d)" != 01 ]; then
+            echo "Copie seulement le 1er du mois"; exit 0
+          fi
+          tag="$(basename "$FILE" .dump.gpg)"
+          gh release create "$tag" "$FILE" --repo "${{ vars.BACKUP_REPO }}" \
+            --title "$tag" --notes "Sauvegarde chiffrée de la base Neon (run ${{ github.run_id }})."
+
+      - name: Alerte en cas d'échec
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Sauvegarde de la base en échec"
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          number=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "Nouvel échec : $run_url"
+          else
+            gh issue create --title "$title" --assignee "${{ github.repository_owner }}" --body "La sauvegarde quotidienne a échoué : $run_url
+
+          Voir docs/SAUVEGARDE.md (section « Quand la sauvegarde échoue »). Fermer ce ticket une fois réparé."
+          fi

@@ -11,7 +11,7 @@ from app.models.user import AuthToken, User, UserRole
 from app.scripts.create_admin import create_admin
 from app.scripts.migrate import detect_unversioned_revision
 from app.services.auth_service import AuthService
-from tests.conftest import ADMIN_EMAIL, make_user
+from tests.conftest import ADMIN_EMAIL, make_user, sqlite_only
 
 PRODUCT = {"category": "Scolaire", "name": "Stylo", "price": 500, "stock": 10}
 
@@ -197,6 +197,7 @@ async def test_create_admin_script() -> None:
         assert await service.authenticate("i@exemple.cm", "motdepasse")
 
 
+@sqlite_only
 async def test_migrate_stamps_unversioned_database_with_users_table() -> None:
     async with async_session_maker() as session:
         conn = await session.connection()

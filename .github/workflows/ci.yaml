@@ -36,3 +36,32 @@ jobs:
           version: "0.11.17"
       - run: uv sync --frozen
       - run: uv run pytest --cov=app --cov-report=term-missing
+
+  # The whole test suite again, on a PostgreSQL schema built by the Alembic migrations (Render runs
+  # them on every start against Neon). SQLite + create_all (job "test") cannot see a model that the
+  # migrations disagree with, nor a migration that fails on PostgreSQL.
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lipa_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lipa_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.17"
+      - run: uv sync --frozen
+      - name: Tests on the migrated schema (python -m app.scripts.migrate, as on Render)
+        run: uv run pytest
+      - name: Models and migrations agree (alembic check)
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+        run: uv run alembic check

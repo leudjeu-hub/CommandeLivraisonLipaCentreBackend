@@ -1,6 +1,9 @@
 from sqlalchemy import inspect
 
 from app.core.db import Base, engine, initialize_database_if_empty
+from tests.conftest import sqlite_only
+
+pytestmark = sqlite_only
 
 
 async def table_names() -> list[str]:
