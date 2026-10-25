@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from httpx import AsyncClient
 from sqlalchemy import select, update
@@ -272,3 +272,28 @@ async def test_registrations_are_limited_site_wide(anon_client: AsyncClient) -> 
     # Logging in is not affected
     login = {"email": "client0@exemple.cm", "password": "motdepasse"}
     assert (await anon_client.post("/auth/login", json=login)).status_code == 200
+
+
+async def test_admin_sees_last_login(client: AsyncClient, anon_client: AsyncClient) -> None:
+    async with async_session_maker() as session:
+        await AuthService(session).register("k@exemple.cm", "motdepasse")
+    users = {u["email"]: u for u in (await client.get("/users/")).json()}
+    assert users["k@exemple.cm"]["last_login_at"] is None
+
+    admin_auth = client.headers.pop("Authorization")
+    before = datetime.now(UTC)
+    wrong = await anon_client.post(
+        "/auth/login", json={"email": "k@exemple.cm", "password": "mauvais-mdp"}
+    )
+    assert wrong.status_code == 401
+    login = await anon_client.post(
+        "/auth/login", json={"email": "k@exemple.cm", "password": "motdepasse"}
+    )
+    assert "last_login_at" not in login.json()["user"]  # only administrators see it
+    anon_client.headers["Authorization"] = admin_auth
+
+    users = {u["email"]: u for u in (await client.get("/users/")).json()}
+    seen = datetime.fromisoformat(users["k@exemple.cm"]["last_login_at"])
+    assert seen.tzinfo is not None
+    assert before - timedelta(seconds=1) <= seen <= datetime.now(UTC) + timedelta(seconds=1)
+    assert users[ADMIN_EMAIL]["last_login_at"] is not None

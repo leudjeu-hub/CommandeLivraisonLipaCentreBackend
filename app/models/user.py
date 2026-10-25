@@ -44,6 +44,8 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=true()
     )
+    # Naive UTC time of the last successful login or sign-up (None: never since this was added).
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class AuthToken(Base):
