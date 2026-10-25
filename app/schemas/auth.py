@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.models.user import UserRole
 
@@ -24,6 +24,18 @@ class UserRead(BaseModel):
     role: UserRole
     created_at: datetime
     is_active: bool
+
+
+class UserAdminRead(UserRead):
+    """What administrators see in the users list."""
+
+    last_login_at: datetime | None
+
+    @field_validator("last_login_at")
+    @classmethod
+    def _as_utc(cls, value: datetime | None) -> datetime | None:
+        """Stored times are naive UTC: say so, so browsers convert them to local time."""
+        return value.replace(tzinfo=UTC) if value is not None and value.tzinfo is None else value
 
 
 class TokenRead(BaseModel):

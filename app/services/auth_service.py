@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
@@ -75,6 +75,8 @@ class AuthService:
             delete(AuthToken).where(AuthToken.user_id == user.id, AuthToken.expires_at < now)
         )
         self.session.add(AuthToken(token_hash=token_hash, user_id=user.id, expires_at=expires_at))
+        # A new session is a login (or a sign-up): the administrator sees it in the users list.
+        user.last_login_at = datetime.now(UTC).replace(tzinfo=None)
         await self.session.commit()
         return token
 
