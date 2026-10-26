@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
@@ -15,9 +15,13 @@ from app.models.product import Product
 from app.schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderSubmit
 from app.utils.whatsapp import build_whatsapp_link
 
-# Cancelled orders are deleted this long after their cancellation (Render's free plan has no
-# scheduler: the purge runs whenever an administrator lists the orders)
-CANCELLED_RETENTION = timedelta(days=30)
+# Cancelled and delivered orders are deleted this long after their last status change, as the
+# site's privacy page (/confidentialite) promises. Render's free plan has no scheduler: the purge
+# runs whenever an administrator lists the orders.
+RETENTION = {
+    OrderStatus.CANCELLED: timedelta(days=30),
+    OrderStatus.DELIVERED: timedelta(days=365),
+}
 
 
 def utcnow() -> datetime:
@@ -82,14 +86,18 @@ class OrderService:
         await self.session.refresh(order)
         return order
 
-    async def purge_cancelled(self) -> int:
-        """Delete orders cancelled more than CANCELLED_RETENTION ago; returns how many."""
-        cutoff = utcnow() - CANCELLED_RETENTION
-        # Cancelled before status_changed_at existed: count from the order's creation
+    async def purge_expired(self) -> int:
+        """Delete orders kept longer than RETENTION allows for their status; returns how many."""
+        now = utcnow()
+        # Changed before status_changed_at existed: count from the order's creation
         changed = func.coalesce(Order.status_changed_at, Order.created_at)
-        result = await self.session.execute(
-            select(Order).where(Order.status == OrderStatus.CANCELLED, changed < cutoff)
+        condition = or_(
+            *(
+                and_(Order.status == status, changed < now - keep)
+                for status, keep in RETENTION.items()
+            )
         )
+        result = await self.session.execute(select(Order).where(condition))
         orders = result.scalars().all()
         for order in orders:
             await self.session.delete(order)
@@ -98,7 +106,7 @@ class OrderService:
         return len(orders)
 
     async def list(self, status: OrderStatus | None = None) -> Sequence[Order]:
-        await self.purge_cancelled()
+        await self.purge_expired()
         query = select(Order).order_by(Order.created_at.desc(), Order.id.desc())
         if status is not None:
             query = query.where(Order.status == status)
