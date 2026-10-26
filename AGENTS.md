@@ -57,7 +57,8 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   (`OrderService.submit`: catalogue prices, no stock taken, delivery details, `order_throttle`
   60/hour site-wide); the site's Gestion > Commandes tab lists them and changes their status. `status_changed_at` (naive UTC)
   is set on each status change; `OrderService.list` first deletes orders cancelled more than 30 days ago
-  (`purge_cancelled`; no scheduler on Render's free plan).
+  or delivered more than 12 months ago, as the site's /confidentialite page says
+  (`purge_expired`, `RETENTION`; no scheduler on Render's free plan).
 - `app/core/rate_limit.py` — in-memory throttles: failed logins per e-mail (10 / 15 min → 429) and
   new accounts site-wide (30 / hour → 429),
   reset in `tests/conftest.py`. `GZipMiddleware` compresses responses over 1 KB (catalogue on 3G).

@@ -181,7 +181,7 @@ once the account exists. Further administrators can be promoted from `/admin` or
 | DELETE | `/products/{product_id}` | Admin | Delete a product |
 | POST | `/orders/` | Admin | Place an order (takes stock); the response includes a WhatsApp link |
 | POST | `/orders/submit` | Public | Record an order or quote from the site's form (no stock taken, 60/hour site-wide) |
-| GET | `/orders/` | Manager, admin | List orders, newest first (`?status=new` to filter); first deletes orders cancelled more than 30 days ago |
+| GET | `/orders/` | Manager, admin | List orders, newest first (`?status=new` to filter); first deletes orders cancelled more than 30 days ago or delivered more than 12 months ago |
 | GET | `/orders/{order_id}` | Manager, admin | Get an order |
 | PATCH | `/orders/{order_id}/status` | Manager, admin | Update an order status |
 | POST | `/auth/register` | Public | Create a customer account and sign in |

@@ -257,6 +257,45 @@ async def test_cancelled_orders_deleted_after_30_days(client: AsyncClient) -> No
     assert any(p["id"] == pen for p in (await client.get("/products/")).json())
 
 
+async def test_delivered_orders_deleted_after_12_months(client: AsyncClient) -> None:
+    from datetime import timedelta
+
+    from sqlalchemy import update
+
+    from app.core.db import async_session_maker
+    from app.models.order import Order
+    from app.services.order_service import utcnow
+
+    pen = await _create_product(client, "Stylo", 500, 10)
+    item = {"items": [{"product_id": pen, "quantity": 1}]}
+    old, recent, pending = [
+        (await client.post("/orders/submit", json={**SUBMIT, **item})).json()["id"]
+        for _ in range(3)
+    ]
+    for order_id in (old, recent):
+        await client.patch(f"/orders/{order_id}/status", json={"status": "delivered"})
+    async with async_session_maker() as session:
+        # Delivered 366 days ago: deleted; delivered 364 days ago: kept
+        for order_id, days in ((old, 366), (recent, 364)):
+            when = utcnow() - timedelta(days=days)
+            await session.execute(
+                update(Order)
+                .where(Order.id == order_id)
+                .values(status_changed_at=when, created_at=when)
+            )
+        # Still "new" after more than a year: only cancelled and delivered orders expire
+        await session.execute(
+            update(Order)
+            .where(Order.id == pending)
+            .values(created_at=utcnow() - timedelta(days=400))
+        )
+        await session.commit()
+
+    ids = [o["id"] for o in (await client.get("/orders/")).json()]
+    assert sorted(ids) == sorted([recent, pending])
+    assert (await client.get(f"/orders/{old}")).status_code == 404
+
+
 async def test_managers_manage_orders_but_others_do_not(anon_client: AsyncClient) -> None:
     from app.models.user import UserRole
     from tests.conftest import make_user
