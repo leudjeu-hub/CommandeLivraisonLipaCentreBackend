@@ -4,7 +4,7 @@ import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, Float, Integer, String, Text
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -66,6 +66,11 @@ class Order(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
     # Naive UTC, set when the status changes: cancelled orders are deleted 30 days after it
     status_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # The customer's account when the order was sent while logged in (GET /orders/mine);
+    # None for guests, orders entered by an admin and orders sent before this existed.
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     items: Mapped[list[OrderItem]] = relationship(
         back_populates="order",
         cascade="all, delete-orphan",

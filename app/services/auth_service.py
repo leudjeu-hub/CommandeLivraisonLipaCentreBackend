@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +22,7 @@ from app.core.security import (
     new_token,
     verify_password,
 )
+from app.models.order import Order
 from app.models.time_entry import TimeEntry
 from app.models.user import STAFF_ROLES, AuthToken, User, UserRole
 
@@ -152,5 +153,9 @@ class AuthService:
         )
         if has_hours is not None:
             raise UserHasTimeEntriesError()
+        # The orders stay for the shop, without the account (SQLite does not apply ON DELETE)
+        await self.session.execute(
+            update(Order).where(Order.user_id == user.id).values(user_id=None)
+        )
         await self.session.delete(user)
         await self.session.commit()

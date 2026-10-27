@@ -69,6 +69,16 @@ async def get_current_user(token: TokenDep, service: AuthServiceDep) -> User:
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
+async def get_optional_user(credentials: BearerDep, service: AuthServiceDep) -> User | None:
+    """The logged-in user, or None: a missing, expired or revoked token never refuses it."""
+    if credentials is None:
+        return None
+    return await service.user_for_token(credentials.credentials)
+
+
+OptionalUserDep = Annotated[User | None, Depends(get_optional_user)]
+
+
 async def require_admin(user: CurrentUserDep) -> User:
     if user.role != UserRole.ADMIN:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Administrator access required")

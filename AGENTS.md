@@ -55,7 +55,8 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   admin-only; order reads and status updates need `require_manager` (manager or admin); `GET /products` stays public. `POST /orders` is
   admin-only too (it takes stock). The site's form calls the public `POST /orders/submit`
   (`OrderService.submit`: catalogue prices, no stock taken, delivery details, `order_throttle`
-  60/hour site-wide); the site's Gestion > Commandes tab lists them and changes their status. `status_changed_at` (naive UTC)
+  60/hour site-wide); sent with a valid bearer token it sets `Order.user_id` (an invalid token is ignored, never a 401),
+  and `GET /orders/mine` (any logged-in account) returns only the orders with that `user_id`; the site's Gestion > Commandes tab lists them and changes their status. `status_changed_at` (naive UTC)
   is set on each status change; `OrderService.list` first deletes orders cancelled more than 30 days ago
   or delivered more than 12 months ago, as the site's /confidentialite page says
   (`purge_expired`, `RETENTION`; no scheduler on Render's free plan).
