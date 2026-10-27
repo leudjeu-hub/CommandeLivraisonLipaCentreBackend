@@ -322,3 +322,54 @@ async def test_managers_manage_orders_but_others_do_not(anon_client: AsyncClient
         token = await make_user(f"{role.value}@exemple.cm", "motdepasse", role)
         response = await anon_client.get("/orders/", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
+
+
+async def test_customer_sees_only_own_orders(anon_client: AsyncClient) -> None:
+    from tests.conftest import make_user
+
+    alice = {"Authorization": f"Bearer {await make_user('alice@exemple.cm', 'motdepasse')}"}
+    bob = {"Authorization": f"Bearer {await make_user('bob@exemple.cm', 'motdepasse')}"}
+    quote = {**SUBMIT, "kind": "quote"}
+    first = (await anon_client.post("/orders/submit", json=quote, headers=alice)).json()["id"]
+    second = (await anon_client.post("/orders/submit", json=quote, headers=alice)).json()["id"]
+    bobs = (await anon_client.post("/orders/submit", json=quote, headers=bob)).json()["id"]
+    # A guest's order (same name and phone as Alice's) is linked to no one
+    await anon_client.post("/orders/submit", json=quote)
+
+    response = await anon_client.get("/orders/mine", headers=alice)
+    assert response.status_code == 200
+    assert [o["id"] for o in response.json()] == [second, first]
+    assert [o["id"] for o in (await anon_client.get("/orders/mine", headers=bob)).json()] == [bobs]
+    # A customer still cannot read the shop's list or someone else's order
+    assert (await anon_client.get("/orders/", headers=alice)).status_code == 403
+    assert (await anon_client.get(f"/orders/{bobs}", headers=alice)).status_code == 403
+
+
+async def test_my_orders_needs_login(anon_client: AsyncClient) -> None:
+    assert (await anon_client.get("/orders/mine")).status_code == 401
+
+
+async def test_submit_with_invalid_token_still_records(anon_client: AsyncClient) -> None:
+    response = await anon_client.post(
+        "/orders/submit",
+        json={**SUBMIT, "kind": "quote"},
+        headers={"Authorization": "Bearer jeton-expire"},
+    )
+    assert response.status_code == 201
+
+
+async def test_deleting_account_keeps_its_orders(client: AsyncClient) -> None:
+    from tests.conftest import make_user
+
+    token = await make_user("client@exemple.cm", "motdepasse")
+    order_id = (
+        await client.post(
+            "/orders/submit",
+            json={**SUBMIT, "kind": "quote"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    ).json()["id"]
+    users = (await client.get("/users/")).json()
+    user_id = next(u["id"] for u in users if u["email"] == "client@exemple.cm")
+    assert (await client.delete(f"/users/{user_id}")).status_code == 204
+    assert (await client.get(f"/orders/{order_id}")).status_code == 200

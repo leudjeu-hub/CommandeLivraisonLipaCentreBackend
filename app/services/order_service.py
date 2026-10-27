@@ -58,9 +58,10 @@ class OrderService:
         await self.session.refresh(order)
         return order
 
-    async def submit(self, data: OrderSubmit) -> Order:
+    async def submit(self, data: OrderSubmit, user_id: int | None = None) -> Order:
         """Record an order or quote sent by the site, at catalogue prices, without taking stock."""
         order = Order(
+            user_id=user_id,
             kind=data.kind,
             customer_name=data.customer_name.strip(),
             phone=data.phone.strip(),
@@ -110,6 +111,18 @@ class OrderService:
         query = select(Order).order_by(Order.created_at.desc(), Order.id.desc())
         if status is not None:
             query = query.where(Order.status == status)
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def list_for_user(self, user_id: int, limit: int = 50) -> Sequence[Order]:
+        """The customer's own orders and quotes, newest first."""
+        await self.purge_expired()
+        query = (
+            select(Order)
+            .where(Order.user_id == user_id)
+            .order_by(Order.created_at.desc(), Order.id.desc())
+            .limit(limit)
+        )
         result = await self.session.execute(query)
         return result.scalars().all()
 

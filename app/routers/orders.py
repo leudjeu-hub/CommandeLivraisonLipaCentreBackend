@@ -1,6 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.deps import OrderServiceDep, require_admin, require_manager
+from app.core.deps import (
+    CurrentUserDep,
+    OptionalUserDep,
+    OrderServiceDep,
+    require_admin,
+    require_manager,
+)
 from app.core.exceptions import TooManyOrdersError
 from app.core.rate_limit import ALL, order_throttle
 from app.models.order import OrderStatus
@@ -11,19 +17,23 @@ router = APIRouter()
 
 # Orders hold customers' names and phone numbers: managers and administrators read them and
 # change their status; POST / takes stock, so it stays admin-only; POST /submit (the site's
-# form) is public.
+# form) is public; GET /mine gives a logged-in customer their own orders, and only theirs.
 ADMIN_ONLY = [Depends(require_admin)]
 MANAGERS = [Depends(require_manager)]
 
 
 @router.post("/submit", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
-async def submit_order(data: OrderSubmit, service: OrderServiceDep) -> OrderRead:
+async def submit_order(
+    data: OrderSubmit, service: OrderServiceDep, user: OptionalUserDep
+) -> OrderRead:
     """Public: the site records each order or quote request here before the customer sends it
-    by WhatsApp or e-mail. No stock is taken; a site-wide limit keeps scripts from flooding it."""
+    by WhatsApp or e-mail. No stock is taken; a site-wide limit keeps scripts from flooding it.
+    Sent with a valid token, the order is linked to that account; an invalid one is ignored, so
+    the order is never lost."""
     if order_throttle.is_blocked(ALL):
         raise TooManyOrdersError()
     order_throttle.record_failure(ALL)
-    order = await service.submit(data)
+    order = await service.submit(data, user.id if user else None)
     return to_order_read(order)
 
 
@@ -40,6 +50,13 @@ async def list_orders(
     service: OrderServiceDep, status: OrderStatus | None = None
 ) -> list[OrderRead]:
     return [to_order_read(order) for order in await service.list(status)]
+
+
+@router.get("/mine", response_model=list[OrderRead])
+async def my_orders(user: CurrentUserDep, service: OrderServiceDep) -> list[OrderRead]:
+    """Any logged-in account: the orders it sent, never anyone else's (filtered on the token's
+    user, not on a name or phone number the customer could type)."""
+    return [to_order_read(order) for order in await service.list_for_user(user.id)]
 
 
 @router.get("/{order_id}", response_model=OrderRead, dependencies=MANAGERS)
