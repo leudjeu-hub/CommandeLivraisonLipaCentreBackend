@@ -48,7 +48,9 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   roles (`UserRole`: `user`, `employee`, `manager`, `admin`; the last active admin cannot be demoted,
   blocked or deleted). `User.is_active`: a blocked account gets 403 on login (after the password
   check) and its tokens stop working. `/users/{id}/active` blocks or unblocks; `DELETE /users/{id}`
-  refuses an account with recorded hours (409) — block it instead. No one can block or delete themselves.
+  refuses an account with recorded hours (409) — block it instead. `POST /users/{id}/password` (admin) gives a
+  forgotten-password account a random temporary password (returned once, sessions revoked); the site sends no e-mail.
+  No one can block, delete or reset themselves.
 - `User.last_login_at` (naive UTC, nullable): set by `create_token` (login and sign-up, not token reuse);
   only `/users` returns it (`UserAdminRead`), `/auth/*` keeps `UserRead`.
 - `app/core/deps.py` — `CurrentUserDep` (401) and `require_admin` (403). Product writes and `/users` are

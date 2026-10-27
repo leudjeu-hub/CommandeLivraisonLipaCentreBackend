@@ -77,3 +77,34 @@ async def test_account_management_requires_admin(anon_client: AsyncClient) -> No
         await anon_client.patch("/users/1/active", json={"active": False}, headers=boss)
     ).status_code == 403
     assert (await anon_client.delete("/users/1", headers=boss)).status_code == 403
+
+
+async def test_admin_gives_a_temporary_password(
+    client: AsyncClient, anon_client: AsyncClient
+) -> None:
+    token = await make_user("awa@exemple.cm", "ancienmotdepasse")
+    awa = await _id(client, "awa@exemple.cm")
+
+    reset = await client.post(f"/users/{awa}/password")
+    assert reset.status_code == 200
+    password = reset.json()["password"]
+    assert len(password) == 10
+    # The old password and the open session stop working; the new password works.
+    assert (await anon_client.get("/auth/me", headers=bearer(token))).status_code == 401
+    old = {"email": "awa@exemple.cm", "password": "ancienmotdepasse"}
+    assert (await anon_client.post("/auth/login", json=old)).status_code == 401
+    new = {"email": "awa@exemple.cm", "password": password}
+    assert (await anon_client.post("/auth/login", json=new)).status_code == 200
+
+
+async def test_temporary_password_is_admin_only_and_not_for_oneself(
+    client: AsyncClient, anon_client: AsyncClient
+) -> None:
+    token = await make_user("bob@exemple.cm", "motdepasse")
+    bob = await _id(client, "bob@exemple.cm")
+    me = (await client.get("/auth/me")).json()["id"]
+
+    assert (await client.post(f"/users/{me}/password")).status_code == 409
+    assert (await client.post("/users/99999/password")).status_code == 404
+    refused = await anon_client.post(f"/users/{bob}/password", headers=bearer(token))
+    assert refused.status_code == 403

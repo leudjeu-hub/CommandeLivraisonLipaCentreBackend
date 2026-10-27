@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 
 from app.core.deps import AdminDep, AuthServiceDep, require_admin
-from app.schemas.auth import ActiveUpdate, RoleUpdate, UserAdminRead
+from app.schemas.auth import ActiveUpdate, RoleUpdate, TemporaryPassword, UserAdminRead
 
 # Every route here is for administrators only.
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -24,6 +24,14 @@ async def set_active(
 ) -> UserAdminRead:
     """Block or unblock an account. Blocking ends its sessions; it keeps its data."""
     return UserAdminRead.model_validate(await service.set_active(user_id, data.active, admin))
+
+
+@router.post("/{user_id}/password", response_model=TemporaryPassword)
+async def reset_password(
+    user_id: int, admin: AdminDep, service: AuthServiceDep
+) -> TemporaryPassword:
+    """Forgotten password: a new random password, shown once to the admin. Ends its sessions."""
+    return TemporaryPassword(password=await service.reset_password(user_id, admin))
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
