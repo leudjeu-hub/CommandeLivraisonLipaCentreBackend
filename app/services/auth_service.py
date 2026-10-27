@@ -20,6 +20,7 @@ from app.core.security import (
     hash_password,
     hash_token,
     new_token,
+    temporary_password,
     verify_password,
 )
 from app.models.order import Order
@@ -141,6 +142,20 @@ class AuthService:
         await self.session.commit()
         await self.session.refresh(user)
         return user
+
+    async def reset_password(self, user_id: int, actor: User) -> str:
+        """Give an account a new random password (the shop reads it out to the customer).
+
+        The site sends no e-mail, so a forgotten password goes through the shop. The old password
+        and every session stop working; the customer logs in with this one."""
+        user = await self._get(user_id)
+        if user.id == actor.id:
+            raise OwnAccountError()
+        password = temporary_password()
+        user.password_hash = hash_password(password)
+        await self.session.execute(delete(AuthToken).where(AuthToken.user_id == user.id))
+        await self.session.commit()
+        return password
 
     async def delete_user(self, user_id: int, actor: User) -> None:
         user = await self._get(user_id)

@@ -77,7 +77,7 @@ class AccountBlockedError(AppError):
 
 class OwnAccountError(AppError):
     status_code = 409
-    detail = "You cannot block or delete your own account"
+    detail = "You cannot block, delete or reset the password of your own account"
 
 
 class UserHasTimeEntriesError(AppError):

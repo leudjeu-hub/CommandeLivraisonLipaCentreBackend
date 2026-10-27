@@ -47,6 +47,15 @@ def verify_password(password: str, stored: str) -> bool:
     return hmac.compare_digest(actual, expected)
 
 
+# Letters and digits a shop assistant can read out on the phone without confusion (no 0/O, 1/l/I)
+_READABLE = "abcdefghjkmnpqrstuvwxyz23456789"
+
+
+def temporary_password(length: int = 10) -> str:
+    """Random password given by the shop when a customer forgot theirs (about 49 bits)."""
+    return "".join(secrets.choice(_READABLE) for _ in range(length))
+
+
 # Verified against when the e-mail is unknown, so a failed login takes the same time either way.
 DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(16))
 

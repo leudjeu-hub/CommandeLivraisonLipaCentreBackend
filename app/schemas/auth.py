@@ -50,3 +50,7 @@ class RoleUpdate(BaseModel):
 
 class ActiveUpdate(BaseModel):
     active: bool
+
+
+class TemporaryPassword(BaseModel):
+    password: str
