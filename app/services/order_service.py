@@ -9,6 +9,7 @@ from app.core.exceptions import (
     PriceOnRequestError,
     ProductNotFoundError,
 )
+from app.core.security import hash_token, new_token
 from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem
 from app.models.product import Product
@@ -58,9 +59,15 @@ class OrderService:
         await self.session.refresh(order)
         return order
 
-    async def submit(self, data: OrderSubmit, user_id: int | None = None) -> Order:
-        """Record an order or quote sent by the site, at catalogue prices, without taking stock."""
+    async def submit(
+        self, data: OrderSubmit, user_id: int | None = None
+    ) -> tuple[Order, str | None]:
+        """Record an order or quote sent by the site, at catalogue prices, without taking stock.
+
+        Returns the order and, for a guest, the code that attaches it to an account later."""
+        code, code_hash = new_token() if user_id is None else (None, None)
         order = Order(
+            claim_token_hash=code_hash,
             user_id=user_id,
             kind=data.kind,
             customer_name=data.customer_name.strip(),
@@ -85,7 +92,21 @@ class OrderService:
         self.session.add(order)
         await self.session.commit()
         await self.session.refresh(order)
-        return order
+        return order, code
+
+    async def claim(self, codes: list[str], user_id: int) -> int:
+        """Attach the guest orders these codes belong to to the account; returns how many."""
+        hashes = {hash_token(code) for code in codes}
+        result = await self.session.execute(
+            select(Order).where(Order.claim_token_hash.in_(hashes), Order.user_id.is_(None))
+        )
+        orders = result.scalars().all()
+        for order in orders:
+            order.user_id = user_id
+            order.claim_token_hash = None
+        if orders:
+            await self.session.commit()
+        return len(orders)
 
     async def purge_expired(self) -> int:
         """Delete orders kept longer than RETENTION allows for their status; returns how many."""

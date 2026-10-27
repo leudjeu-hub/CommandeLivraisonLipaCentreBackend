@@ -71,6 +71,8 @@ class OrderRead(BaseModel):
     status_changed_at: datetime | None
     items: list[OrderItemRead]
     whatsapp_url: str | None = None
+    # Only in the answer to a guest's POST /submit (never stored or listed): see OrderClaim
+    claim_code: str | None = None
 
     @field_validator("created_at", "status_changed_at")
     @classmethod
@@ -81,3 +83,14 @@ class OrderRead(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: OrderStatus
+
+
+class OrderClaim(BaseModel):
+    """Codes a browser received for orders sent without an account, to attach them to the account
+    the customer has since logged in to."""
+
+    codes: list[str] = Field(min_length=1, max_length=20)
+
+
+class OrderClaimResult(BaseModel):
+    claimed: int

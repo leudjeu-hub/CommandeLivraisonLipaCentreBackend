@@ -71,6 +71,9 @@ class Order(Base):
     user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    # SHA-256 of the code given to a guest's browser (POST /submit): logging in later, the customer
+    # attaches the order to their account with it (POST /orders/claim); cleared once used
+    claim_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     items: Mapped[list[OrderItem]] = relationship(
         back_populates="order",
         cascade="all, delete-orphan",
