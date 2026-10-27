@@ -10,7 +10,14 @@ from app.core.deps import (
 from app.core.exceptions import TooManyOrdersError
 from app.core.rate_limit import ALL, order_throttle
 from app.models.order import OrderStatus
-from app.schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderSubmit
+from app.schemas.order import (
+    OrderClaim,
+    OrderClaimResult,
+    OrderCreate,
+    OrderRead,
+    OrderStatusUpdate,
+    OrderSubmit,
+)
 from app.services.order_service import to_order_read
 
 router = APIRouter()
@@ -33,8 +40,20 @@ async def submit_order(
     if order_throttle.is_blocked(ALL):
         raise TooManyOrdersError()
     order_throttle.record_failure(ALL)
-    order = await service.submit(data, user.id if user else None)
-    return to_order_read(order)
+    order, code = await service.submit(data, user.id if user else None)
+    read = to_order_read(order)
+    read.claim_code = code
+    return read
+
+
+@router.post("/claim", response_model=OrderClaimResult)
+async def claim_orders(
+    data: OrderClaim, user: CurrentUserDep, service: OrderServiceDep
+) -> OrderClaimResult:
+    """A customer who ordered as a guest, then logged in: the browser sends the codes it got from
+    POST /submit, and those orders join the account (GET /mine). Without the code, no one can
+    attach an order: a name or phone number is never enough."""
+    return OrderClaimResult(claimed=await service.claim(data.codes, user.id))
 
 
 @router.post(

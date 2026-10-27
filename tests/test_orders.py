@@ -373,3 +373,41 @@ async def test_deleting_account_keeps_its_orders(client: AsyncClient) -> None:
     user_id = next(u["id"] for u in users if u["email"] == "client@exemple.cm")
     assert (await client.delete(f"/users/{user_id}")).status_code == 204
     assert (await client.get(f"/orders/{order_id}")).status_code == 200
+
+
+async def test_guest_order_claimed_after_login(anon_client: AsyncClient) -> None:
+    from tests.conftest import make_user
+
+    quote = {**SUBMIT, "kind": "quote"}
+    guest = (await anon_client.post("/orders/submit", json=quote)).json()
+    assert guest["claim_code"]
+    other = (await anon_client.post("/orders/submit", json=quote)).json()
+    awa = {"Authorization": f"Bearer {await make_user('awa@exemple.cm', 'motdepasse')}"}
+    # Sent while logged in: already linked, no code
+    linked = (await anon_client.post("/orders/submit", json=quote, headers=awa)).json()
+    assert linked["claim_code"] is None
+
+    claim = await anon_client.post(
+        "/orders/claim", json={"codes": [guest["claim_code"], "code-invente"]}, headers=awa
+    )
+    assert claim.json() == {"claimed": 1}
+    mine = [o["id"] for o in (await anon_client.get("/orders/mine", headers=awa)).json()]
+    assert mine == [linked["id"], guest["id"]]
+    assert other["id"] not in mine
+    # A code works once: another account cannot take the order afterwards
+    bob = {"Authorization": f"Bearer {await make_user('bob@exemple.cm', 'motdepasse')}"}
+    claim = await anon_client.post(
+        "/orders/claim", json={"codes": [guest["claim_code"]]}, headers=bob
+    )
+    assert claim.json() == {"claimed": 0}
+
+
+async def test_claim_needs_login_and_code_never_listed(client: AsyncClient) -> None:
+    client_token = client.headers.pop("Authorization")
+    code = (await client.post("/orders/submit", json={**SUBMIT, "kind": "quote"})).json()[
+        "claim_code"
+    ]
+    assert (await client.post("/orders/claim", json={"codes": [code]})).status_code == 401
+    client.headers["Authorization"] = client_token
+    for order in (await client.get("/orders/")).json():
+        assert order["claim_code"] is None
