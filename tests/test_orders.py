@@ -411,3 +411,54 @@ async def test_claim_needs_login_and_code_never_listed(client: AsyncClient) -> N
     client.headers["Authorization"] = client_token
     for order in (await client.get("/orders/")).json():
         assert order["claim_code"] is None
+
+
+async def test_admin_notes_on_orders_stay_internal(anon_client: AsyncClient) -> None:
+    from app.models.user import UserRole
+    from tests.conftest import make_user
+
+    awa = {"Authorization": f"Bearer {await make_user('awa@exemple.cm', 'motdepasse')}"}
+    submitted = await anon_client.post(
+        "/orders/submit", json={**SUBMIT, "kind": "quote"}, headers=awa
+    )
+    assert "admin_notes" not in submitted.json()
+    order_id = submitted.json()["id"]
+
+    manager = {
+        "Authorization": f"Bearer {await make_user('r@exemple.cm', 'motdepasse', UserRole.MANAGER)}"
+    }
+    response = await anon_client.patch(
+        f"/orders/{order_id}/admin-notes",
+        json={"admin_notes": "Payé 5 000 FCFA d'avance"},
+        headers=manager,
+    )
+    assert response.status_code == 200
+    assert response.json()["admin_notes"] == "Payé 5 000 FCFA d'avance"
+    # The customer's own text is untouched
+    assert response.json()["notes"] == SUBMIT["notes"]
+    listed = (await anon_client.get("/orders/", headers=manager)).json()
+    assert listed[0]["admin_notes"] == "Payé 5 000 FCFA d'avance"
+    status = await anon_client.patch(
+        f"/orders/{order_id}/status", json={"status": "confirmed"}, headers=manager
+    )
+    assert status.json()["admin_notes"] == "Payé 5 000 FCFA d'avance"
+
+    # The customer never sees them and cannot write them
+    mine = (await anon_client.get("/orders/mine", headers=awa)).json()
+    assert "admin_notes" not in mine[0]
+    denied = await anon_client.patch(
+        f"/orders/{order_id}/admin-notes", json={"admin_notes": "x"}, headers=awa
+    )
+    assert denied.status_code == 403
+    assert (
+        await anon_client.patch(f"/orders/{order_id}/admin-notes", json={"admin_notes": "x"})
+    ).status_code == 401
+
+    cleared = await anon_client.patch(
+        f"/orders/{order_id}/admin-notes", json={"admin_notes": ""}, headers=manager
+    )
+    assert cleared.json()["admin_notes"] is None
+    missing = await anon_client.patch(
+        "/orders/9999/admin-notes", json={"admin_notes": "x"}, headers=manager
+    )
+    assert missing.status_code == 404

@@ -30,6 +30,7 @@ class UserAdminRead(UserRead):
     """What administrators see in the users list."""
 
     last_login_at: datetime | None
+    admin_notes: str | None
 
     @field_validator("last_login_at")
     @classmethod

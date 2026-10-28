@@ -131,6 +131,13 @@ class AuthService:
         await self.session.refresh(user)
         return user
 
+    async def set_admin_notes(self, user_id: int, notes: str) -> User:
+        user = await self._get(user_id)
+        user.admin_notes = notes.strip() or None
+        await self.session.commit()
+        await self.session.refresh(user)
+        return user
+
     async def set_active(self, user_id: int, active: bool, actor: User) -> User:
         user = await self._get(user_id)
         if user.id == actor.id:

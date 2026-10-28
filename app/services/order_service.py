@@ -13,7 +13,13 @@ from app.core.security import hash_token, new_token
 from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem
 from app.models.product import Product
-from app.schemas.order import OrderCreate, OrderRead, OrderStatusUpdate, OrderSubmit
+from app.schemas.order import (
+    OrderAdminRead,
+    OrderCreate,
+    OrderRead,
+    OrderStatusUpdate,
+    OrderSubmit,
+)
 from app.utils.whatsapp import build_whatsapp_link
 
 # Cancelled and delivered orders are deleted this long after their last status change, as the
@@ -161,8 +167,24 @@ class OrderService:
         await self.session.refresh(order)
         return order
 
+    async def set_admin_notes(self, order_id: int, notes: str) -> Order | None:
+        order = await self.get(order_id)
+        if order is None:
+            return None
+        order.admin_notes = notes.strip() or None
+        await self.session.commit()
+        await self.session.refresh(order)
+        return order
+
 
 def to_order_read(order: Order) -> OrderRead:
     read = OrderRead.model_validate(order)
+    read.whatsapp_url = build_whatsapp_link(order)
+    return read
+
+
+def to_order_admin_read(order: Order) -> OrderAdminRead:
+    """For managers and administrators only: includes the internal remarks."""
+    read = OrderAdminRead.model_validate(order)
     read.whatsapp_url = build_whatsapp_link(order)
     return read
