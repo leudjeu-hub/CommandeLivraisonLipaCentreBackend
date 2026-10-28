@@ -121,10 +121,15 @@ async def test_quoted_cells_and_line_numbers(client: AsyncClient) -> None:
     assert [(e["line"], e["code"]) for e in report["errors"]] == [(4, "invalid_category")]
 
 
-async def test_import_is_admin_only(anon_client: AsyncClient) -> None:
-    body = {"content": "categorie;nom\nLivres;Roman\n", "dry_run": False}
+async def test_import_is_for_managers(anon_client: AsyncClient) -> None:
+    body = {"content": "categorie;nom\nLivres;Roman\n", "dry_run": True}
     assert (await anon_client.post("/products/import", json=body)).status_code == 401
-    for role in ("user", "employee", "manager"):
+    token = await make_user("manager@test.cm", "password-123", "manager")
+    response = await anon_client.post(
+        "/products/import", json=body, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+    for role in ("user", "employee"):
         token = await make_user(f"{role}@test.cm", "password-123", role)
         response = await anon_client.post(
             "/products/import", json=body, headers={"Authorization": f"Bearer {token}"}

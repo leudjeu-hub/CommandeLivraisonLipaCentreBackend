@@ -176,9 +176,9 @@ once the account exists. Further administrators can be promoted from `/admin` or
 | GET | `/admin` | Public page | Admin dashboard (logs in through the API) |
 | GET | `/products/` | Public | List products |
 | GET | `/products/{product_id}` | Public | Get a product |
-| POST | `/products/` | Admin | Create a product |
-| PUT | `/products/{product_id}` | Admin | Update a product |
-| DELETE | `/products/{product_id}` | Admin | Delete a product |
+| POST | `/products/` | Manager, admin | Create a product |
+| PUT | `/products/{product_id}` | Manager, admin | Update a product |
+| DELETE | `/products/{product_id}` | Manager, admin | Delete a product |
 | POST | `/orders/` | Admin | Place an order (takes stock); the response includes a WhatsApp link |
 | POST | `/orders/submit` | Public | Record an order or quote from the site's form (no stock taken, 60/hour site-wide) |
 | GET | `/orders/` | Manager, admin | List orders, newest first (`?status=new` to filter); first deletes orders cancelled more than 30 days ago or delivered more than 12 months ago |

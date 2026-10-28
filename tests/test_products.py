@@ -2,6 +2,7 @@ from httpx import AsyncClient
 
 from app.core.db import async_session_maker
 from app.services.catalogue_seed import seed_products_if_empty
+from tests.conftest import make_user
 
 
 async def test_create_and_get_product(client: AsyncClient) -> None:
@@ -170,3 +171,32 @@ async def test_preflight_is_cached_for_a_day(anon_client: AsyncClient) -> None:
     )
     assert response.status_code == 200
     assert response.headers["access-control-max-age"] == "86400"
+
+
+async def test_managers_edit_products(anon_client: AsyncClient) -> None:
+    manager = {"Authorization": f"Bearer {await make_user('m@test.cm', 'password-123', 'manager')}"}
+    created = await anon_client.post(
+        "/products/", json={"category": "Scolaire", "name": "Stylo", "price": 500}, headers=manager
+    )
+    assert created.status_code == 201
+    product_id = created.json()["id"]
+    response = await anon_client.put(
+        f"/products/{product_id}", json={"price": 600}, headers=manager
+    )
+    assert response.status_code == 200
+    assert response.json()["price"] == 600
+
+    employee = {
+        "Authorization": f"Bearer {await make_user('e@test.cm', 'password-123', 'employee')}"
+    }
+    for request in (
+        anon_client.post(
+            "/products/", json={"category": "Scolaire", "name": "X"}, headers=employee
+        ),
+        anon_client.put(f"/products/{product_id}", json={"price": 1}, headers=employee),
+        anon_client.delete(f"/products/{product_id}", headers=employee),
+    ):
+        assert (await request).status_code == 403
+
+    response = await anon_client.delete(f"/products/{product_id}", headers=manager)
+    assert response.status_code == 204
