@@ -55,11 +55,13 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   only `/users` returns it (`UserAdminRead`), `/auth/*` keeps `UserRead`.
 - Internal remarks (`admin_notes`, text ≤ 2000, empty → `NULL`; migration 0014), never shown to the
   customer: on accounts via `PATCH /users/{id}/admin-notes` (admin, returned only in `UserAdminRead`), on
-  orders via `PATCH /orders/{id}/admin-notes` (`require_manager`). Staff order routes return
+  orders via `PATCH /orders/{id}/admin-notes` (`require_staff`). Staff order routes return
   `OrderAdminRead`; `/orders/submit` and `/orders/mine` keep `OrderRead` without it. `Order.notes` stays
   the customer's own text.
-- `app/core/deps.py` — `CurrentUserDep` (401) and `require_admin` (403). Product writes and `/users` are
-  admin-only; order reads and status updates need `require_manager` (manager or admin), but only an admin may change the status of a `delivered` order (403 otherwise); `GET /products` stays public. `POST /orders` is
+- `app/core/deps.py` — `CurrentUserDep` (401) and `require_admin` (403). Product writes (create, edit, import, delete) and
+  order reads, status updates and internal remarks need `require_staff` (employee, manager or admin); `/users`,
+  `DELETE /orders/{id}` and changing the status of a `delivered` order are admin-only (403 otherwise); the
+  staff's hours stay `require_manager`; `GET /products` stays public. `POST /orders` is
   admin-only too (it takes stock). The site's form calls the public `POST /orders/submit`
   (`OrderService.submit`: catalogue prices, no stock taken, delivery details, `order_throttle`
   60/hour site-wide); sent with a valid bearer token it sets `Order.user_id` (an invalid token is ignored, never a 401),

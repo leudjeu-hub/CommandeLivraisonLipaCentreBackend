@@ -173,6 +173,5 @@ async def test_manager_sees_and_corrects_others_but_not_own(anon_client: AsyncCl
 async def test_manager_has_no_admin_rights(anon_client: AsyncClient) -> None:
     boss = bearer(await make_user("resp@exemple.cm", "motdepasse", UserRole.MANAGER))
     assert (await anon_client.get("/users/", headers=boss)).status_code == 403
-    assert (await anon_client.post("/products/", json={}, headers=boss)).status_code == 403
     emp = bearer(await make_user("emp@exemple.cm", "motdepasse", UserRole.EMPLOYEE))
     assert (await anon_client.get("/time/staff", headers=emp)).status_code == 403
