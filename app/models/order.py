@@ -74,6 +74,8 @@ class Order(Base):
     # SHA-256 of the code given to a guest's browser (POST /submit): logging in later, the customer
     # attaches the order to their account with it (POST /orders/claim); cleared once used
     claim_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    # The shop's internal remarks (Gestion > Commandes): never sent to the customer, unlike `notes`
+    admin_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     items: Mapped[list[OrderItem]] = relationship(
         back_populates="order",
         cascade="all, delete-orphan",

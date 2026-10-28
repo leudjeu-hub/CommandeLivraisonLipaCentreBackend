@@ -53,6 +53,11 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   No one can block, delete or reset themselves.
 - `User.last_login_at` (naive UTC, nullable): set by `create_token` (login and sign-up, not token reuse);
   only `/users` returns it (`UserAdminRead`), `/auth/*` keeps `UserRead`.
+- Internal remarks (`admin_notes`, text ≤ 2000, empty → `NULL`; migration 0014), never shown to the
+  customer: on accounts via `PATCH /users/{id}/admin-notes` (admin, returned only in `UserAdminRead`), on
+  orders via `PATCH /orders/{id}/admin-notes` (`require_manager`). Staff order routes return
+  `OrderAdminRead`; `/orders/submit` and `/orders/mine` keep `OrderRead` without it. `Order.notes` stays
+  the customer's own text.
 - `app/core/deps.py` — `CurrentUserDep` (401) and `require_admin` (403). Product writes and `/users` are
   admin-only; order reads and status updates need `require_manager` (manager or admin); `GET /products` stays public. `POST /orders` is
   admin-only too (it takes stock). The site's form calls the public `POST /orders/submit`

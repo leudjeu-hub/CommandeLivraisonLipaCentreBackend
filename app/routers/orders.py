@@ -11,6 +11,8 @@ from app.core.exceptions import TooManyOrdersError
 from app.core.rate_limit import ALL, order_throttle
 from app.models.order import OrderStatus
 from app.schemas.order import (
+    AdminNotesUpdate,
+    OrderAdminRead,
     OrderClaim,
     OrderClaimResult,
     OrderCreate,
@@ -18,13 +20,14 @@ from app.schemas.order import (
     OrderStatusUpdate,
     OrderSubmit,
 )
-from app.services.order_service import to_order_read
+from app.services.order_service import to_order_admin_read, to_order_read
 
 router = APIRouter()
 
 # Orders hold customers' names and phone numbers: managers and administrators read them and
 # change their status; POST / takes stock, so it stays admin-only; POST /submit (the site's
 # form) is public; GET /mine gives a logged-in customer their own orders, and only theirs.
+# Staff routes answer with OrderAdminRead (internal remarks); customers' routes never do.
 ADMIN_ONLY = [Depends(require_admin)]
 MANAGERS = [Depends(require_manager)]
 
@@ -57,18 +60,21 @@ async def claim_orders(
 
 
 @router.post(
-    "/", response_model=OrderRead, status_code=status.HTTP_201_CREATED, dependencies=ADMIN_ONLY
+    "/",
+    response_model=OrderAdminRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=ADMIN_ONLY,
 )
-async def create_order(data: OrderCreate, service: OrderServiceDep) -> OrderRead:
+async def create_order(data: OrderCreate, service: OrderServiceDep) -> OrderAdminRead:
     order = await service.create(data)
-    return to_order_read(order)
+    return to_order_admin_read(order)
 
 
-@router.get("/", response_model=list[OrderRead], dependencies=MANAGERS)
+@router.get("/", response_model=list[OrderAdminRead], dependencies=MANAGERS)
 async def list_orders(
     service: OrderServiceDep, status: OrderStatus | None = None
-) -> list[OrderRead]:
-    return [to_order_read(order) for order in await service.list(status)]
+) -> list[OrderAdminRead]:
+    return [to_order_admin_read(order) for order in await service.list(status)]
 
 
 @router.get("/mine", response_model=list[OrderRead])
@@ -78,19 +84,30 @@ async def my_orders(user: CurrentUserDep, service: OrderServiceDep) -> list[Orde
     return [to_order_read(order) for order in await service.list_for_user(user.id)]
 
 
-@router.get("/{order_id}", response_model=OrderRead, dependencies=MANAGERS)
-async def get_order(order_id: int, service: OrderServiceDep) -> OrderRead:
+@router.get("/{order_id}", response_model=OrderAdminRead, dependencies=MANAGERS)
+async def get_order(order_id: int, service: OrderServiceDep) -> OrderAdminRead:
     order = await service.get(order_id)
     if order is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
-    return to_order_read(order)
+    return to_order_admin_read(order)
 
 
-@router.patch("/{order_id}/status", response_model=OrderRead, dependencies=MANAGERS)
+@router.patch("/{order_id}/status", response_model=OrderAdminRead, dependencies=MANAGERS)
 async def update_order_status(
     order_id: int, data: OrderStatusUpdate, service: OrderServiceDep
-) -> OrderRead:
+) -> OrderAdminRead:
     order = await service.update_status(order_id, data)
     if order is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
-    return to_order_read(order)
+    return to_order_admin_read(order)
+
+
+@router.patch("/{order_id}/admin-notes", response_model=OrderAdminRead, dependencies=MANAGERS)
+async def update_order_admin_notes(
+    order_id: int, data: AdminNotesUpdate, service: OrderServiceDep
+) -> OrderAdminRead:
+    """The shop's internal remarks on an order (empty clears them). Never shown to the customer."""
+    order = await service.set_admin_notes(order_id, data.admin_notes)
+    if order is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
+    return to_order_admin_read(order)

@@ -297,3 +297,41 @@ async def test_admin_sees_last_login(client: AsyncClient, anon_client: AsyncClie
     assert seen.tzinfo is not None
     assert before - timedelta(seconds=1) <= seen <= datetime.now(UTC) + timedelta(seconds=1)
     assert users[ADMIN_EMAIL]["last_login_at"] is not None
+
+
+async def test_admin_notes_on_accounts(client: AsyncClient, anon_client: AsyncClient) -> None:
+    from tests.conftest import make_user
+
+    token = await make_user("n@exemple.cm", "motdepasse")
+    users = {u["email"]: u for u in (await client.get("/users/")).json()}
+    user_id = users["n@exemple.cm"]["id"]
+    assert users["n@exemple.cm"]["admin_notes"] is None
+
+    response = await client.patch(
+        f"/users/{user_id}/admin-notes", json={"admin_notes": "  Client de l'école Bastos  "}
+    )
+    assert response.status_code == 200
+    assert response.json()["admin_notes"] == "Client de l'école Bastos"
+    users = {u["email"]: u for u in (await client.get("/users/")).json()}
+    assert users["n@exemple.cm"]["admin_notes"] == "Client de l'école Bastos"
+
+    # The account's owner never sees them, and cannot write them
+    admin_auth = client.headers.pop("Authorization")
+    me = await anon_client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert "admin_notes" not in me.json()
+    denied = await anon_client.patch(
+        f"/users/{user_id}/admin-notes",
+        json={"admin_notes": "x"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert denied.status_code == 403
+    anon_client.headers["Authorization"] = admin_auth
+
+    # Empty clears them; too long is refused; unknown account is 404
+    cleared = await client.patch(f"/users/{user_id}/admin-notes", json={"admin_notes": " "})
+    assert cleared.json()["admin_notes"] is None
+    too_long = await client.patch(f"/users/{user_id}/admin-notes", json={"admin_notes": "x" * 2001})
+    assert too_long.status_code == 422
+    assert (
+        await client.patch("/users/9999/admin-notes", json={"admin_notes": "x"})
+    ).status_code == 404

@@ -81,6 +81,19 @@ class OrderRead(BaseModel):
         return value.replace(tzinfo=UTC) if value is not None and value.tzinfo is None else value
 
 
+class OrderAdminRead(OrderRead):
+    """What managers and administrators see: the shop's internal remarks too. Customers get
+    OrderRead (POST /submit, GET /mine), which has no such field."""
+
+    admin_notes: str | None
+
+
+class AdminNotesUpdate(BaseModel):
+    """Internal remarks on an order or an account; empty clears them."""
+
+    admin_notes: str = Field(max_length=2000)
+
+
 class OrderStatusUpdate(BaseModel):
     status: OrderStatus
 

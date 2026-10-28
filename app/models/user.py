@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, true
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -46,6 +46,8 @@ class User(Base):
     )
     # Naive UTC time of the last successful login or sign-up (None: never since this was added).
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Administrators' internal remarks (Gestion > Utilisateurs); only /users returns them.
+    admin_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class AuthToken(Base):
