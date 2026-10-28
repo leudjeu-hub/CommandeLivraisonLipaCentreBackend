@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.deps import (
     CurrentUserDep,
+    ManagerDep,
     OptionalUserDep,
     OrderServiceDep,
     require_admin,
@@ -10,6 +11,7 @@ from app.core.deps import (
 from app.core.exceptions import TooManyOrdersError
 from app.core.rate_limit import ALL, order_throttle
 from app.models.order import OrderStatus
+from app.models.user import UserRole
 from app.schemas.order import (
     AdminNotesUpdate,
     OrderAdminRead,
@@ -25,8 +27,9 @@ from app.services.order_service import to_order_admin_read, to_order_read
 router = APIRouter()
 
 # Orders hold customers' names and phone numbers: managers and administrators read them and
-# change their status; POST / takes stock, so it stays admin-only; POST /submit (the site's
-# form) is public; GET /mine gives a logged-in customer their own orders, and only theirs.
+# change their status (once delivered, only administrators may change it); POST / takes stock,
+# so it stays admin-only; POST /submit (the site's form) is public; GET /mine gives a
+# logged-in customer their own orders, and only theirs.
 # Staff routes answer with OrderAdminRead (internal remarks); customers' routes never do.
 ADMIN_ONLY = [Depends(require_admin)]
 MANAGERS = [Depends(require_manager)]
@@ -92,11 +95,11 @@ async def get_order(order_id: int, service: OrderServiceDep) -> OrderAdminRead:
     return to_order_admin_read(order)
 
 
-@router.patch("/{order_id}/status", response_model=OrderAdminRead, dependencies=MANAGERS)
+@router.patch("/{order_id}/status", response_model=OrderAdminRead)
 async def update_order_status(
-    order_id: int, data: OrderStatusUpdate, service: OrderServiceDep
+    order_id: int, data: OrderStatusUpdate, service: OrderServiceDep, user: ManagerDep
 ) -> OrderAdminRead:
-    order = await service.update_status(order_id, data)
+    order = await service.update_status(order_id, data, by_admin=user.role == UserRole.ADMIN)
     if order is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
     return to_order_admin_read(order)
