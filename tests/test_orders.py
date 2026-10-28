@@ -324,6 +324,35 @@ async def test_managers_manage_orders_but_others_do_not(anon_client: AsyncClient
         assert response.status_code == 403
 
 
+async def test_only_admins_change_a_delivered_order(anon_client: AsyncClient) -> None:
+    from app.models.user import UserRole
+    from tests.conftest import make_user
+
+    order_id = (await anon_client.post("/orders/submit", json={**SUBMIT, "kind": "quote"})).json()[
+        "id"
+    ]
+    manager_token = await make_user("resp@exemple.cm", "motdepasse", UserRole.MANAGER)
+    admin_token = await make_user("chef@exemple.cm", "motdepasse", UserRole.ADMIN)
+    manager = {"Authorization": f"Bearer {manager_token}"}
+    admin = {"Authorization": f"Bearer {admin_token}"}
+    url = f"/orders/{order_id}/status"
+    # A manager may still mark an order delivered, and repeat it harmlessly
+    for _ in range(2):
+        response = await anon_client.patch(url, json={"status": "delivered"}, headers=manager)
+        assert response.status_code == 200
+    for other in ("new", "confirmed", "cancelled"):
+        response = await anon_client.patch(url, json={"status": other}, headers=manager)
+        assert response.status_code == 403
+        assert "administrator" in response.json()["detail"]
+    detail = (await anon_client.get(f"/orders/{order_id}", headers=manager)).json()
+    assert detail["status"] == "delivered"
+    # The administrator can reopen it; then the manager may change it again
+    response = await anon_client.patch(url, json={"status": "confirmed"}, headers=admin)
+    assert response.json()["status"] == "confirmed"
+    response = await anon_client.patch(url, json={"status": "cancelled"}, headers=manager)
+    assert response.json()["status"] == "cancelled"
+
+
 async def test_customer_sees_only_own_orders(anon_client: AsyncClient) -> None:
     from tests.conftest import make_user
 

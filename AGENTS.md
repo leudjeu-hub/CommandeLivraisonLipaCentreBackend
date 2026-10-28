@@ -59,7 +59,7 @@ Layered, one direction only: `routers/` → `services/` → `models/` + `schemas
   `OrderAdminRead`; `/orders/submit` and `/orders/mine` keep `OrderRead` without it. `Order.notes` stays
   the customer's own text.
 - `app/core/deps.py` — `CurrentUserDep` (401) and `require_admin` (403). Product writes and `/users` are
-  admin-only; order reads and status updates need `require_manager` (manager or admin); `GET /products` stays public. `POST /orders` is
+  admin-only; order reads and status updates need `require_manager` (manager or admin), but only an admin may change the status of a `delivered` order (403 otherwise); `GET /products` stays public. `POST /orders` is
   admin-only too (it takes stock). The site's form calls the public `POST /orders/submit`
   (`OrderService.submit`: catalogue prices, no stock taken, delivery details, `order_throttle`
   60/hour site-wide); sent with a valid bearer token it sets `Order.user_id` (an invalid token is ignored, never a 401),

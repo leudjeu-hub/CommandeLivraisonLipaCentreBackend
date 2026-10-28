@@ -105,3 +105,8 @@ class TimeEntryNotFoundError(AppError):
 
     def __init__(self, entry_id: int) -> None:
         super().__init__(f"Time entry {entry_id} not found")
+
+
+class DeliveredOrderLockedError(AppError):
+    status_code = 403
+    detail = "Only an administrator can change the status of a delivered order"

@@ -5,6 +5,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
+    DeliveredOrderLockedError,
     InsufficientStockError,
     PriceOnRequestError,
     ProductNotFoundError,
@@ -156,11 +157,16 @@ class OrderService:
     async def get(self, order_id: int) -> Order | None:
         return await self.session.get(Order, order_id)
 
-    async def update_status(self, order_id: int, data: OrderStatusUpdate) -> Order | None:
+    async def update_status(
+        self, order_id: int, data: OrderStatusUpdate, *, by_admin: bool
+    ) -> Order | None:
         order = await self.get(order_id)
         if order is None:
             return None
         if order.status != data.status:
+            # A delivered order is settled: only an administrator may reopen it (Alain, 2026-10-28)
+            if order.status == OrderStatus.DELIVERED and not by_admin:
+                raise DeliveredOrderLockedError
             order.status = data.status
             order.status_changed_at = utcnow()
         await self.session.commit()

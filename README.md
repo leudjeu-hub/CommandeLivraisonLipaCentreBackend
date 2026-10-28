@@ -183,7 +183,7 @@ once the account exists. Further administrators can be promoted from `/admin` or
 | POST | `/orders/submit` | Public | Record an order or quote from the site's form (no stock taken, 60/hour site-wide) |
 | GET | `/orders/` | Manager, admin | List orders, newest first (`?status=new` to filter); first deletes orders cancelled more than 30 days ago or delivered more than 12 months ago |
 | GET | `/orders/{order_id}` | Manager, admin | Get an order |
-| PATCH | `/orders/{order_id}/status` | Manager, admin | Update an order status |
+| PATCH | `/orders/{order_id}/status` | Manager, admin | Update an order status; once `delivered`, admin only (403 for a manager) |
 | POST | `/auth/register` | Public | Create a customer account and sign in |
 | POST | `/auth/login` | Public | Sign in |
 | POST | `/auth/logout` | Signed in | Revoke the current token |
