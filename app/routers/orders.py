@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.deps import (
     CurrentUserDep,
-    ManagerDep,
     OptionalUserDep,
     OrderServiceDep,
+    StaffDep,
     require_admin,
-    require_manager,
+    require_staff,
 )
 from app.core.exceptions import TooManyOrdersError
 from app.core.rate_limit import ALL, order_throttle
@@ -26,13 +26,14 @@ from app.services.order_service import to_order_admin_read, to_order_read
 
 router = APIRouter()
 
-# Orders hold customers' names and phone numbers: managers and administrators read them and
-# change their status (once delivered, only administrators may change it); POST / takes stock,
-# so it stays admin-only; POST /submit (the site's form) is public; GET /mine gives a
-# logged-in customer their own orders, and only theirs.
+# Orders hold customers' names and phone numbers: staff (employees, managers, administrators)
+# read them and change their status (once delivered, only administrators may change it); only
+# administrators delete one by hand; POST / takes stock, so it stays admin-only; POST /submit
+# (the site's form) is public; GET /mine gives a logged-in customer their own orders, and only
+# theirs.
 # Staff routes answer with OrderAdminRead (internal remarks); customers' routes never do.
 ADMIN_ONLY = [Depends(require_admin)]
-MANAGERS = [Depends(require_manager)]
+STAFF = [Depends(require_staff)]
 
 
 @router.post("/submit", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
@@ -73,7 +74,7 @@ async def create_order(data: OrderCreate, service: OrderServiceDep) -> OrderAdmi
     return to_order_admin_read(order)
 
 
-@router.get("/", response_model=list[OrderAdminRead], dependencies=MANAGERS)
+@router.get("/", response_model=list[OrderAdminRead], dependencies=STAFF)
 async def list_orders(
     service: OrderServiceDep, status: OrderStatus | None = None
 ) -> list[OrderAdminRead]:
@@ -87,7 +88,7 @@ async def my_orders(user: CurrentUserDep, service: OrderServiceDep) -> list[Orde
     return [to_order_read(order) for order in await service.list_for_user(user.id)]
 
 
-@router.get("/{order_id}", response_model=OrderAdminRead, dependencies=MANAGERS)
+@router.get("/{order_id}", response_model=OrderAdminRead, dependencies=STAFF)
 async def get_order(order_id: int, service: OrderServiceDep) -> OrderAdminRead:
     order = await service.get(order_id)
     if order is None:
@@ -97,7 +98,7 @@ async def get_order(order_id: int, service: OrderServiceDep) -> OrderAdminRead:
 
 @router.patch("/{order_id}/status", response_model=OrderAdminRead)
 async def update_order_status(
-    order_id: int, data: OrderStatusUpdate, service: OrderServiceDep, user: ManagerDep
+    order_id: int, data: OrderStatusUpdate, service: OrderServiceDep, user: StaffDep
 ) -> OrderAdminRead:
     order = await service.update_status(order_id, data, by_admin=user.role == UserRole.ADMIN)
     if order is None:
@@ -105,7 +106,7 @@ async def update_order_status(
     return to_order_admin_read(order)
 
 
-@router.patch("/{order_id}/admin-notes", response_model=OrderAdminRead, dependencies=MANAGERS)
+@router.patch("/{order_id}/admin-notes", response_model=OrderAdminRead, dependencies=STAFF)
 async def update_order_admin_notes(
     order_id: int, data: AdminNotesUpdate, service: OrderServiceDep
 ) -> OrderAdminRead:
@@ -114,3 +115,11 @@ async def update_order_admin_notes(
     if order is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
     return to_order_admin_read(order)
+
+
+@router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=ADMIN_ONLY)
+async def delete_order(order_id: int, service: OrderServiceDep) -> None:
+    """Remove an order and its lines for good (Alain, 2026-10-28: administrators only).
+    Stock is left as it is: orders from the site never took any."""
+    if not await service.delete(order_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")

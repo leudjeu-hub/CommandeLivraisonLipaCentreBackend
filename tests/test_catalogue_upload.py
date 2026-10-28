@@ -121,20 +121,20 @@ async def test_quoted_cells_and_line_numbers(client: AsyncClient) -> None:
     assert [(e["line"], e["code"]) for e in report["errors"]] == [(4, "invalid_category")]
 
 
-async def test_import_is_for_managers(anon_client: AsyncClient) -> None:
+async def test_import_is_for_staff(anon_client: AsyncClient) -> None:
     body = {"content": "categorie;nom\nLivres;Roman\n", "dry_run": True}
     assert (await anon_client.post("/products/import", json=body)).status_code == 401
-    token = await make_user("manager@test.cm", "password-123", "manager")
-    response = await anon_client.post(
-        "/products/import", json=body, headers={"Authorization": f"Bearer {token}"}
-    )
-    assert response.status_code == 200
-    for role in ("user", "employee"):
+    for role in ("employee", "manager"):
         token = await make_user(f"{role}@test.cm", "password-123", role)
         response = await anon_client.post(
             "/products/import", json=body, headers={"Authorization": f"Bearer {token}"}
         )
-        assert response.status_code == 403
+        assert response.status_code == 200
+    token = await make_user("user@test.cm", "password-123", "user")
+    response = await anon_client.post(
+        "/products/import", json=body, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 403
 
 
 async def test_family_column(client: AsyncClient) -> None:

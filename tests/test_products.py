@@ -173,7 +173,7 @@ async def test_preflight_is_cached_for_a_day(anon_client: AsyncClient) -> None:
     assert response.headers["access-control-max-age"] == "86400"
 
 
-async def test_managers_edit_products(anon_client: AsyncClient) -> None:
+async def test_staff_edit_products(anon_client: AsyncClient) -> None:
     manager = {"Authorization": f"Bearer {await make_user('m@test.cm', 'password-123', 'manager')}"}
     created = await anon_client.post(
         "/products/", json={"category": "Scolaire", "name": "Stylo", "price": 500}, headers=manager
@@ -189,12 +189,16 @@ async def test_managers_edit_products(anon_client: AsyncClient) -> None:
     employee = {
         "Authorization": f"Bearer {await make_user('e@test.cm', 'password-123', 'employee')}"
     }
+    response = await anon_client.put(f"/products/{product_id}", json={"stock": 3}, headers=employee)
+    assert response.status_code == 200
+
+    customer = {"Authorization": f"Bearer {await make_user('c@test.cm', 'password-123')}"}
     for request in (
         anon_client.post(
-            "/products/", json={"category": "Scolaire", "name": "X"}, headers=employee
+            "/products/", json={"category": "Scolaire", "name": "X"}, headers=customer
         ),
-        anon_client.put(f"/products/{product_id}", json={"price": 1}, headers=employee),
-        anon_client.delete(f"/products/{product_id}", headers=employee),
+        anon_client.put(f"/products/{product_id}", json={"price": 1}, headers=customer),
+        anon_client.delete(f"/products/{product_id}", headers=customer),
     ):
         assert (await request).status_code == 403
 

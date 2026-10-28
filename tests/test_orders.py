@@ -296,32 +296,41 @@ async def test_delivered_orders_deleted_after_12_months(client: AsyncClient) -> 
     assert (await client.get(f"/orders/{old}")).status_code == 404
 
 
-async def test_managers_manage_orders_but_others_do_not(anon_client: AsyncClient) -> None:
+async def test_staff_manage_orders_but_customers_do_not(anon_client: AsyncClient) -> None:
     from app.models.user import UserRole
     from tests.conftest import make_user
 
     order_id = (await anon_client.post("/orders/submit", json={**SUBMIT, "kind": "quote"})).json()[
         "id"
     ]
-    manager = await make_user("resp@exemple.cm", "motdepasse", UserRole.MANAGER)
-    headers = {"Authorization": f"Bearer {manager}"}
-    assert (await anon_client.get("/orders/", headers=headers)).status_code == 200
-    assert (await anon_client.get(f"/orders/{order_id}", headers=headers)).status_code == 200
-    response = await anon_client.patch(
-        f"/orders/{order_id}/status", json={"status": "confirmed"}, headers=headers
-    )
-    assert response.json()["status"] == "confirmed"
-    # Entering an order by hand takes stock: administrators only
-    created = await anon_client.post(
-        "/orders/",
-        json={"customer_name": "A", "phone": "1", "items": [{"product_id": 1, "quantity": 1}]},
-        headers=headers,
-    )
-    assert created.status_code == 403
-    for role in (UserRole.EMPLOYEE, UserRole.USER):
+    for role in (UserRole.MANAGER, UserRole.EMPLOYEE):
         token = await make_user(f"{role.value}@exemple.cm", "motdepasse", role)
-        response = await anon_client.get("/orders/", headers={"Authorization": f"Bearer {token}"})
-        assert response.status_code == 403
+        headers = {"Authorization": f"Bearer {token}"}
+        assert (await anon_client.get("/orders/", headers=headers)).status_code == 200
+        assert (await anon_client.get(f"/orders/{order_id}", headers=headers)).status_code == 200
+        response = await anon_client.patch(
+            f"/orders/{order_id}/status", json={"status": "confirmed"}, headers=headers
+        )
+        assert response.json()["status"] == "confirmed"
+        # Entering an order by hand takes stock, deleting one is final: administrators only
+        created = await anon_client.post(
+            "/orders/",
+            json={"customer_name": "A", "phone": "1", "items": [{"product_id": 1, "quantity": 1}]},
+            headers=headers,
+        )
+        assert created.status_code == 403
+        deleted = await anon_client.delete(f"/orders/{order_id}", headers=headers)
+        assert deleted.status_code == 403
+    token = await make_user("client@exemple.cm", "motdepasse", UserRole.USER)
+    response = await anon_client.get("/orders/", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 403
+
+
+async def test_only_admins_delete_an_order(client: AsyncClient) -> None:
+    order_id = (await client.post("/orders/submit", json={**SUBMIT, "kind": "quote"})).json()["id"]
+    assert (await client.delete(f"/orders/{order_id}")).status_code == 204
+    assert (await client.get(f"/orders/{order_id}")).status_code == 404
+    assert (await client.delete(f"/orders/{order_id}")).status_code == 404
 
 
 async def test_only_admins_change_a_delivered_order(anon_client: AsyncClient) -> None:
@@ -344,6 +353,10 @@ async def test_only_admins_change_a_delivered_order(anon_client: AsyncClient) ->
         response = await anon_client.patch(url, json={"status": other}, headers=manager)
         assert response.status_code == 403
         assert "administrator" in response.json()["detail"]
+    employee_token = await make_user("emp@exemple.cm", "motdepasse", UserRole.EMPLOYEE)
+    employee = {"Authorization": f"Bearer {employee_token}"}
+    response = await anon_client.patch(url, json={"status": "new"}, headers=employee)
+    assert response.status_code == 403
     detail = (await anon_client.get(f"/orders/{order_id}", headers=manager)).json()
     assert detail["status"] == "delivered"
     # The administrator can reopen it; then the manager may change it again

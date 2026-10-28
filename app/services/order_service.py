@@ -173,6 +173,14 @@ class OrderService:
         await self.session.refresh(order)
         return order
 
+    async def delete(self, order_id: int) -> bool:
+        order = await self.get(order_id)
+        if order is None:
+            return False
+        await self.session.delete(order)
+        await self.session.commit()
+        return True
+
     async def set_admin_notes(self, order_id: int, notes: str) -> Order | None:
         order = await self.get(order_id)
         if order is None:

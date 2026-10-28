@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from app.core.deps import ProductServiceDep, SessionDep, require_manager
+from app.core.deps import ProductServiceDep, SessionDep, require_staff
 from app.schemas.product import (
     CatalogueImport,
     CatalogueImportReport,
@@ -13,8 +13,8 @@ from app.services.catalogue_import import import_catalogue
 router = APIRouter()
 
 # Reading the catalogue is public; creating, editing, importing and deleting products is for
-# managers and administrators.
-MANAGERS = [Depends(require_manager)]
+# staff: employees, managers and administrators.
+STAFF = [Depends(require_staff)]
 
 # The list is public and the same for everyone: browsers may reuse it for a minute, then show the
 # stale copy while refetching in the background for ten more (a revisit on 3G skips ~30 KB gzipped).
@@ -37,13 +37,13 @@ async def get_product(product_id: int, service: ProductServiceDep) -> ProductRea
 
 
 @router.post(
-    "/", response_model=ProductRead, status_code=status.HTTP_201_CREATED, dependencies=MANAGERS
+    "/", response_model=ProductRead, status_code=status.HTTP_201_CREATED, dependencies=STAFF
 )
 async def create_product(data: ProductCreate, service: ProductServiceDep) -> ProductRead:
     return ProductRead.model_validate(await service.create(data))
 
 
-@router.post("/import", response_model=CatalogueImportReport, dependencies=MANAGERS)
+@router.post("/import", response_model=CatalogueImportReport, dependencies=STAFF)
 async def import_products(data: CatalogueImport, session: SessionDep) -> CatalogueImportReport:
     """Create or update products from a CSV file; nothing is written if any row is invalid."""
     report = await import_catalogue(session, data.content, apply=not data.dry_run)
@@ -51,7 +51,7 @@ async def import_products(data: CatalogueImport, session: SessionDep) -> Catalog
     return CatalogueImportReport.model_validate({**vars(report), "applied": applied})
 
 
-@router.put("/{product_id}", response_model=ProductRead, dependencies=MANAGERS)
+@router.put("/{product_id}", response_model=ProductRead, dependencies=STAFF)
 async def update_product(
     product_id: int, data: ProductUpdate, service: ProductServiceDep
 ) -> ProductRead:
@@ -61,7 +61,7 @@ async def update_product(
     return ProductRead.model_validate(product)
 
 
-@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=MANAGERS)
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=STAFF)
 async def delete_product(product_id: int, service: ProductServiceDep) -> None:
     if not await service.delete(product_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
